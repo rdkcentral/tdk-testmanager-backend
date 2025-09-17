@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -285,7 +285,8 @@ public class RDKCertificationService implements IRDKCertificationService {
 					+ Constants.PYTHON_FILE_EXTENSION;
 			File pythonFile = new File(pythonFilePath);
 
-			String configFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR + fileName + Constants.CONFIG_FILE_EXTENSION;
+			String configFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR + fileName
+					+ Constants.CONFIG_FILE_EXTENSION;
 			File configFile = new File(configFilePath);
 			if (pythonFile.exists()) {
 				pythonFile.delete();

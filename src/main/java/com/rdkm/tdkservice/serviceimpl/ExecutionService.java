@@ -1,5 +1,5 @@
 /*
- * If not stated otherwise in this file or this component's Licenses.txt file the
+ * If not stated otherwise in this file or this component's LICENSE file the
  * following copyright and licenses apply:
  *
  * Copyright 2024 RDK Management
@@ -446,7 +446,7 @@ public class ExecutionService implements IExecutionService {
 				continue;
 			}
 			isExecutionTriggered = true;
-String executionName = getExecutionName(executionDetailsDTO.getExecutionName(), device,
+			String executionName = getExecutionName(executionDetailsDTO.getExecutionName(), device,
 					executionDetailsDTO.getTestType());
 			responseLogs.append("TestSuite execution on device: ").append(device.getName()).append(".");
 			executionAsyncService.prepareAndExecuteMultiScript(device, scripts, executionDetailsDTO.getUser(),
@@ -2365,18 +2365,27 @@ String executionName = getExecutionName(executionDetailsDTO.getExecutionName(), 
 				filteredExecutionList = this.filterTheExecutionByDeviceType(filteredExecutionList,
 						searchFilterRequest.getDeviceType());
 			}
-			if (filteredExecutionList.isEmpty() || filteredExecutionList == null) {
-				LOGGER.info("No executions found based on the filter criteria");
+			if (filteredExecutionList == null || filteredExecutionList.isEmpty()) {
+				LOGGER.info("No executions found based on the device type filter");
 				return null;
 			}
-
+			// Device name filter (after device type filter)
+			if (!Utils.isEmpty(searchFilterRequest.getDeviceName())) {
+				LOGGER.info("Filtering the execution list based on device name: {}",
+						searchFilterRequest.getDeviceName());
+				filteredExecutionList = this.filterTheExecutionByDeviceName(filteredExecutionList,
+						searchFilterRequest.getDeviceName());
+				if (filteredExecutionList == null || filteredExecutionList.isEmpty()) {
+					LOGGER.info("No executions found based on the device name filter");
+					return null;
+				}
+			}
 		}
 		List<ExecutionListDTO> finalExecutionListResponse = this
 				.getExecutionDTOListFromExecutionList(filteredExecutionList);
 		LOGGER.info("Fetching execution details based on custom filter criteria completed successfully");
 
 		return finalExecutionListResponse;
-
 	}
 
 	/**
@@ -2907,4 +2916,74 @@ String executionName = getExecutionName(executionDetailsDTO.getExecutionName(), 
 		}
 	}
 
+	/**
+	 * this method is used to get executions by status
+	 * 
+	 * @param status       execution status (e.g., RUNNING, COMPLETED, FAILED)
+	 * @param categoryName category name (optional)
+	 * @param page         page number (optional)
+	 * @param size         page size (optional)
+	 * @return
+	 */
+	@Override
+	public List<ExecutionListDTO> getAllExecutionByStatus(String status, String categoryName, int page, int size) {
+		LOGGER.info("Fetching executions by status/result: {} and category: {}", status, categoryName);
+		Pageable pageable = PageRequest.of(page, size, Sort.by("createdDate").descending());
+		Page<Execution> pageExecutions = null;
+
+		// Try to match status to ExecutionProgressStatus
+		try {
+			ExecutionProgressStatus progressStatus = ExecutionProgressStatus.valueOf(status);
+			if (categoryName != null && !categoryName.isEmpty()) {
+				Category category = Category.valueOf(categoryName);
+				pageExecutions = executionRepository.findByExecutionStatusAndCategory(progressStatus, category,
+						pageable);
+			} else {
+				pageExecutions = executionRepository.findByExecutionStatus(progressStatus, pageable);
+			}
+		} catch (Exception e) {
+			// Not a progress status, try result status
+			try {
+				ExecutionOverallResultStatus resultStatus = ExecutionOverallResultStatus.valueOf(status);
+				if (categoryName != null && !categoryName.isEmpty()) {
+					Category category = Category.valueOf(categoryName);
+					pageExecutions = executionRepository.findByResultAndCategory(resultStatus, category, pageable);
+				} else {
+					pageExecutions = executionRepository.findByResult(resultStatus, pageable);
+				}
+			} catch (Exception ex) {
+				LOGGER.error("Invalid execution status/result: {}", status);
+				throw new UserInputException("Invalid execution status/result: " + status);
+			}
+		}
+
+		List<Execution> executions = pageExecutions != null ? pageExecutions.getContent() : new ArrayList<>();
+		List<ExecutionListDTO> executionListDTO = getExecutionDTOListFromExecutionList(executions);
+		// Set status using getStatusFromExecution for each DTO
+		for (int i = 0; i < executionListDTO.size(); i++) {
+			ExecutionListDTO dto = executionListDTO.get(i);
+			Execution execution = executions.get(i);
+			dto.setStatus(getStatusFromExecution(execution));
+		}
+		return executionListDTO;
+	}
+
+	/**
+	 * This method is used to filter the execution list by device name
+	 * 
+	 * @param filteredExecutionList - the filtered execution list with other filters
+	 * @param deviceName            - the device name
+	 * @return the filtered execution list by device name
+	 */
+	private List<Execution> filterTheExecutionByDeviceName(List<Execution> filteredExecutionList, String deviceName) {
+		List<Execution> filteredExecutionListByDeviceName = new ArrayList<>();
+		for (Execution execution : filteredExecutionList) {
+			ExecutionDevice executionDevice = executionDeviceRepository.findByExecution(execution);
+			if (executionDevice != null && executionDevice.getDevice() != null
+					&& executionDevice.getDevice().equalsIgnoreCase(deviceName)) {
+				filteredExecutionListByDeviceName.add(execution);
+			}
+		}
+		return filteredExecutionListByDeviceName;
+	}
 }

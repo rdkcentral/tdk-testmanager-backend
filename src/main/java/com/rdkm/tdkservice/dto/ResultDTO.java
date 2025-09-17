@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -23,14 +23,15 @@ import java.util.ArrayList;
 
 import lombok.Data;
 
-
 /**
- * CIRequestDTO is a Data Transfer Object that represents a request for a CI (Continuous Integration) service.
- * It contains information about the service, its status, start time, initiator, duration, and results.
+ * CIRequestDTO is a Data Transfer Object that represents a request for a CI
+ * (Continuous Integration) service.
+ * It contains information about the service, its status, start time, initiator,
+ * duration, and results.
  */
 @Data
 public class ResultDTO {
-    
+
     /**
      * The name of the CI service.
      */

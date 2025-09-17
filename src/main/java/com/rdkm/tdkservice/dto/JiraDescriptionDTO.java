@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -33,10 +33,10 @@ public class JiraDescriptionDTO {
 	 * The description of the Jira ticket.
 	 */
 	private String description;
-	
+
 	/**
 	 * The image version of the Jira ticket.
 	 */
 	private String imageVersion;
-	
+
 }

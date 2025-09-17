@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -27,7 +27,7 @@ import lombok.Data;
  * Data Transfer Object for Ticket Create Response.
  * This class is used to encapsulate the response data when a ticket is created.
  * 
- * @author 
+ * @author
  */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)

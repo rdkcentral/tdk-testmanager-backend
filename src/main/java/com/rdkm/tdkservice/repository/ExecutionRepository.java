@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -212,4 +212,37 @@ public interface ExecutionRepository extends JpaRepository<Execution, UUID> {
 	 */
 	List<Execution> findByExecutionStatusAndCreatedDateBefore(ExecutionProgressStatus status, Instant createdDate);
 
+	/**
+	 * Retrieves all Executions filtered by overall result status with pagination.
+	 */
+	@Query("SELECT e FROM Execution e WHERE e.result = :result")
+	Page<Execution> findByResult(@Param("result") ExecutionOverallResultStatus result, Pageable pageable);
+
+	/**
+	 * Retrieves all Executions filtered by overall result status and category with
+	 * pagination.
+	 */
+	@Query("SELECT e FROM Execution e WHERE e.result = :result AND e.category = :category")
+	Page<Execution> findByResultAndCategory(@Param("result") ExecutionOverallResultStatus result,
+			@Param("category") Category category, Pageable pageable);
+
+	/**
+	 * Retrieves all the executions by status and category
+	 * 
+	 * @param progressStatus
+	 * @param category
+	 * @param pageable
+	 * @return
+	 */
+	Page<Execution> findByExecutionStatusAndCategory(ExecutionProgressStatus progressStatus, Category category,
+			Pageable pageable);
+
+	/**
+	 * Retrieves all the executions by status
+	 * 
+	 * @param progressStatus
+	 * @param pageable
+	 * @return
+	 */
+	Page<Execution> findByExecutionStatus(ExecutionProgressStatus progressStatus, Pageable pageable);
 }

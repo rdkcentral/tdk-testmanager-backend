@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -82,7 +82,8 @@ public interface ExecutionResultRepository extends JpaRepository<ExecutionResult
 	 * @return the count of execution result
 	 */
 	@Query("SELECT COUNT(er) FROM ExecutionResult er JOIN Script s ON er.script = s.name WHERE er.execution.id = :executionId AND s.module.name = :moduleName")
-	int countByExecutionIdAndScriptModuleName(@Param("executionId") UUID executionId, @Param("moduleName") String moduleName);
+	int countByExecutionIdAndScriptModuleName(@Param("executionId") UUID executionId,
+			@Param("moduleName") String moduleName);
 
 	/**
 	 * Count the execution result by execution, script and result.
@@ -93,6 +94,7 @@ public interface ExecutionResultRepository extends JpaRepository<ExecutionResult
 	 * @return the count of execution result
 	 */
 	@Query("SELECT COUNT(er) FROM ExecutionResult er JOIN Script s ON er.script = s.name WHERE er.execution.id = :executionId AND s.module.name = :moduleName AND er.result = :result")
-	int countByExecutionIdAndScriptModuleNameAndResult(@Param("executionId") UUID executionId, @Param("moduleName") String moduleName, @Param("result") ExecutionResultStatus result);
+	int countByExecutionIdAndScriptModuleNameAndResult(@Param("executionId") UUID executionId,
+			@Param("moduleName") String moduleName, @Param("result") ExecutionResultStatus result);
 
 }

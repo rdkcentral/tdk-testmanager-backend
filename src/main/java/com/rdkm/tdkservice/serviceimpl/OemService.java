@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -77,7 +77,7 @@ public class OemService implements IOemService {
 		LOGGER.info("Going to create oemDTO with name: " + oemDTO.toString());
 
 		Category category = commonService.validateCategory(oemDTO.getOemCategory());
-		
+
 		if (oemRepository.existsByNameAndCategory(oemDTO.getOemName(), category)) {
 			LOGGER.info("oem already exists with the same name: " + oemDTO.getOemName());
 			throw new ResourceAlreadyExistsException(Constants.OEM_NAME, oemDTO.getOemName());

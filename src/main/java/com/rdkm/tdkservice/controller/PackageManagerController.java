@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -185,7 +185,7 @@ public class PackageManagerController {
 	public ResponseEntity<Response> uploadGenericPackage(@RequestParam String type,
 			@RequestParam MultipartFile uploadFile, @RequestParam String device) {
 		LOGGER.info("uploadGenericPackage method is called");
-		boolean status = packageManagerService.uploadGenericPackage(type ,uploadFile, device);
+		boolean status = packageManagerService.uploadGenericPackage(type, uploadFile, device);
 		if (status) {
 			LOGGER.info("Generic Package uploaded successfully");
 			return ResponseUtils.getSuccessResponse("Generic Package uploaded successfully");

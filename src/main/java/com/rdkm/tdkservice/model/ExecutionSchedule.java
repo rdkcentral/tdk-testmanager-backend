@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -49,18 +49,17 @@ public class ExecutionSchedule extends BaseEntity {
 	 * The start time for the cron job
 	 */
 	private Instant cronStartTime;
-	
+
 	/**
 	 * The end time for the cron job
 	 */
 	private Instant cronEndTime;
-	
-	
+
 	/**
 	 * The cron expression for scheduling.
 	 */
 	private String cronExpression;
-	
+
 	/**
 	 * Cron query in human-readable format to be displayed on UI.
 	 */
@@ -73,8 +72,6 @@ public class ExecutionSchedule extends BaseEntity {
 	 */
 	@Enumerated(EnumType.STRING)
 	private ScheduleType scheduleType;
-
-
 
 	/**
 	 * The status of the schedule.

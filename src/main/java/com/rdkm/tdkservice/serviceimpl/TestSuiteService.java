@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -501,7 +501,7 @@ public class TestSuiteService implements ITestSuiteService {
 			scriptTestSuite.setTestSuite(testSuite);
 			scriptTestSuite.setScriptOrder(i);
 			scriptTestSuiteRepository.save(scriptTestSuite);
-			LOGGER.info("Script added to test suite: " + scriptName);
+			LOGGER.debug("Script added to test suite: " + scriptName);
 		}
 	}
 

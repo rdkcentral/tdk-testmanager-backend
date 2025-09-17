@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -202,4 +202,19 @@ public interface IScriptService {
 	 * @return - the module execution time in seconds
 	 */
 	Integer getModuleScriptTimeout(String moduleName);
+
+	/**
+	 * This method is used to download the all MD files
+	 * 
+	 * @return ByteArrayInputStream containing the ZIP
+	 */
+	ByteArrayInputStream downloadAllMarkdownFilesZip();
+
+	/**
+	 * This method is used to download the MD files based on category
+	 * 
+	 * @param category
+	 * @return ByteArrayInputStream containing the ZIP
+	 */
+	ByteArrayInputStream downloadMarkdownByCategoryZip(String category);
 }

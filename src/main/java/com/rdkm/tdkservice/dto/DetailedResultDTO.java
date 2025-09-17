@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -24,7 +24,8 @@ import java.util.ArrayList;
 import lombok.Data;
 
 /**
- * CIResultDTO is a Data Transfer Object that holds the result of a CI execution.
+ * CIResultDTO is a Data Transfer Object that holds the result of a CI
+ * execution.
  * It contains the name of the execution and details of the devices involved.
  */
 @Data
@@ -34,12 +35,12 @@ public class DetailedResultDTO {
 	 * The name of the CI execution.
 	 */
 	public String executionName;
-	
+
 	/**
 	 * The status of the CI execution.
 	 */
 	private String executionStatus;
-	
+
 	/**
 	 * The script or test suite used in the CI execution.
 	 */

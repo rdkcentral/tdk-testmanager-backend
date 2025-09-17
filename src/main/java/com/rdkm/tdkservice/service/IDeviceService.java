@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -167,7 +167,7 @@ public interface IDeviceService {
 	 * @return List<Device> - List of devices with updated status
 	 */
 	public List<DeviceStatusResponseDTO> updateAndGetAllDeviceStatus(String category);
-	
+
 	/**
 	 * This method is used to find device details by its name.
 	 * 

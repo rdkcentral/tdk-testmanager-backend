@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -45,7 +45,9 @@ public interface ScriptTestSuiteRepository extends JpaRepository<ScriptTestSuite
 	 * 
 	 * @param testSuite
 	 */
-	@Modifying @Transactional @Query("DELETE FROM ScriptTestSuite sts WHERE sts.testSuite = :testSuite") 
+	@Modifying
+	@Transactional
+	@Query("DELETE FROM ScriptTestSuite sts WHERE sts.testSuite = :testSuite")
 	void deleteByTestSuite(@Param("testSuite") TestSuite testSuite);
 
 	/**

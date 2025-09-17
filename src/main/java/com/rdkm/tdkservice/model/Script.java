@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -137,14 +137,14 @@ public class Script extends BaseEntity {
 	/**
 	 * Prerequisites for the testcase
 	 */
-	@OneToMany(mappedBy = "script",cascade = CascadeType.ALL,orphanRemoval = true)
+	@OneToMany(mappedBy = "script", cascade = CascadeType.ALL, orphanRemoval = true)
 	@OrderBy("createdDate ASC")
 	private List<PreCondition> preConditions;
 
 	/**
 	 * Automation Approach or steps
 	 */
-	@OneToMany(mappedBy = "script",cascade = CascadeType.ALL,orphanRemoval = true)
+	@OneToMany(mappedBy = "script", cascade = CascadeType.ALL, orphanRemoval = true)
 	@OrderBy("createdDate ASC")
 	private List<TestStep> testSteps;
 

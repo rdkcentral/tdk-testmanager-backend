@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -1167,7 +1167,7 @@ public class ExecutionController {
 
 	/**
 	 * This method is used to get the execution details based on the filter with
-	 * criteria like fromdate, toDate, Category , deviceType etc.
+	 * criteria like fromdate, toDate, Category, deviceType, deviceName, etc.
 	 * 
 	 * @param filterRequest - the filter request object that contains the criteria
 	 * @return ResponseEntity<?> - the response entity with the execution details
@@ -1180,6 +1180,7 @@ public class ExecutionController {
 	public ResponseEntity<DataResponse> getExecutionDetailsByFilter(
 			@RequestBody ExecutionSearchFilterDTO filterRequest) {
 		LOGGER.info("Get execution details by filter called");
+		// Ensure deviceName is included in filter criteria if provided
 		List<ExecutionListDTO> response = executionService.getExecutionDetailsByFilter(filterRequest);
 		LOGGER.info("Execution details fetched successfully");
 		if (response == null || response.isEmpty()) {
@@ -1473,6 +1474,36 @@ public class ExecutionController {
 		} catch (Exception e) {
 			LOGGER.error("Failed to get execution timeout for script name: {}: {}", scriptName, e.getMessage());
 			throw new TDKServiceException("Failed to get execution timeout for script");
+		}
+	}
+
+	/**
+	 * Get all executions by status
+	 * 
+	 * @param status       the execution status (e.g., RUNNING, COMPLETED, FAILED)
+	 * @param categoryName the category (optional)
+	 * @param page         page number (optional)
+	 * @param size         page size (optional)
+	 * @return ResponseEntity<DataResponse> with executions matching status
+	 */
+	@Operation(summary = "Get all executions by status", description = "Fetch all executions filtered by status")
+	@ApiResponses(value = {
+			@ApiResponse(responseCode = "200", description = "Executions fetched successfully"),
+			@ApiResponse(responseCode = "500", description = "Failed to fetch executions")
+	})
+	@GetMapping("/getAllExecutionByStatus")
+	public ResponseEntity<DataResponse> getAllExecutionByStatus(
+			@RequestParam String status,
+			@RequestParam(required = false) String categoryName,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "10") int size) {
+		LOGGER.info("Fetching executions by status: {} and category: {}", status, categoryName);
+		// You should implement this method in your ExecutionService
+		List<ExecutionListDTO> executions = executionService.getAllExecutionByStatus(status, categoryName, page, size);
+		if (executions != null && !executions.isEmpty()) {
+			return ResponseUtils.getSuccessDataResponse("Executions fetched successfully", executions);
+		} else {
+			return ResponseUtils.getSuccessDataResponse("No executions found for status: " + status, null);
 		}
 	}
 

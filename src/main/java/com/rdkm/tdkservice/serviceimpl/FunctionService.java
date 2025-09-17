@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -75,8 +75,12 @@ public class FunctionService implements IFunctionService {
 
 		LOGGER.info("Creating new function: {}", functionCreateDTO);
 
+		Category category = Category.getCategory(functionCreateDTO.getFunctionCategory());
+		if (null == category) {
+			throw new ResourceNotFoundException(Constants.CATEGORY, functionCreateDTO.getFunctionCategory());
+		}
 		Module module = moduleRepository.findByName(functionCreateDTO.getModuleName());
-		if (functionRepository.existsByName(functionCreateDTO.getFunctionName())) {
+		if (functionRepository.existsByNameAndCategory(functionCreateDTO.getFunctionName(), category)) {
 			LOGGER.error("Function with name {} already exists", functionCreateDTO.getFunctionName());
 			throw new ResourceAlreadyExistsException(Constants.FUNCTION_NAME, functionCreateDTO.getFunctionName());
 		}
@@ -84,10 +88,6 @@ public class FunctionService implements IFunctionService {
 		if (module == null) {
 			LOGGER.error("Module not found: {}", functionCreateDTO.getModuleName());
 			throw new ResourceNotFoundException(Constants.MODULE_NAME, functionCreateDTO.getModuleName());
-		}
-		Category category = Category.getCategory(functionCreateDTO.getFunctionCategory());
-		if (null == category) {
-			throw new ResourceNotFoundException(Constants.CATEGORY, functionCreateDTO.getFunctionCategory());
 		}
 		Function function = new Function();
 
@@ -127,11 +127,13 @@ public class FunctionService implements IFunctionService {
 		}
 
 		if (!Utils.isEmpty(functionDTO.getFunctionName())) {
-			Function newFunction = functionRepository.findByName(functionDTO.getFunctionName());
+			Function newFunction = functionRepository.findByNameAndCategory(functionDTO.getFunctionName(),
+					function.getCategory());
 			if (newFunction != null && functionDTO.getFunctionName().equalsIgnoreCase(function.getName())) {
 				function.setName(functionDTO.getFunctionName());
 			} else {
-				if (functionRepository.existsByName(functionDTO.getFunctionName())) {
+				Category category = Category.getCategory(functionDTO.getFunctionCategory());
+				if (functionRepository.existsByNameAndCategory(functionDTO.getFunctionName(), category)) {
 					LOGGER.info("Function already exists with the same name: " + functionDTO.getFunctionName());
 					throw new ResourceAlreadyExistsException(Constants.FUNCTION_NAME, functionDTO.getFunctionName());
 				} else {
@@ -249,7 +251,7 @@ public class FunctionService implements IFunctionService {
 		Module module = moduleRepository.findByName(moduleName);
 		if (module == null) {
 			throw new ResourceNotFoundException("Module", moduleName);
-		}else {
+		} else {
 			LOGGER.info("Module found: {}", module.getName());
 		}
 		List<Function> functions = functionRepository.findAllByModuleId(module.getId());

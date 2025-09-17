@@ -1,5 +1,5 @@
 /*
- * If not stated otherwise in this file or this component's Licenses.txt file the
+ * If not stated otherwise in this file or this component's LICENSE file the
  * following copyright and licenses apply:
  *
  * Copyright 2024 RDK Management
@@ -49,11 +49,12 @@ public class PythonLibraryScriptExecutorService {
 	 * This method runs the resetAgent Script. This library uses “resetAgent” python
 	 * library to reset the TDK application running in the DUT.
 	 * 
-	 * @param deviceIP   - IP of the device
-	 * @param devicePort - TDK Agent port number
-	 * @param enableReset - true - To restart agent, false - To reset device state to FREE
+	 * @param deviceIP    - IP of the device
+	 * @param devicePort  - TDK Agent port number
+	 * @param enableReset - true - To restart agent, false - To reset device state
+	 *                    to FREE
 	 */
-	public void resetAgentForTDKDevices(String deviceIP, String devicePort , String enableReset) {
+	public void resetAgentForTDKDevices(String deviceIP, String devicePort, String enableReset) {
 		try {
 			LOGGER.info("Going to run resetAgent Script for device: {} with port: {}", deviceIP, devicePort);
 			File resetAgentScriptFile = new File(

@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -57,6 +57,11 @@ public class ExecutionSearchFilterDTO {
 	 * The type of device to filter by.
 	 */
 	String deviceType;
+
+	/**
+	 * The name of the device to filter by (optional).
+	 */
+	String deviceName;
 
 	/**
 	 * The category of the execution

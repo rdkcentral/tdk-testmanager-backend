@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -39,10 +39,11 @@ public interface FunctionRepository extends JpaRepository<Function, UUID> {
 	/**
 	 * Finds a function by its name.
 	 *
-	 * @param name the name of the function
+	 * @param name     the name of the function
+	 * @param category the category of the functions
 	 * @return the function with the specified name, or null if not found
 	 */
-	Function findByName(String name);
+	Function findByNameAndCategory(String name, Category category);
 
 	/**
 	 * Finds all functions by their category.
@@ -55,10 +56,11 @@ public interface FunctionRepository extends JpaRepository<Function, UUID> {
 	/**
 	 * Checks if a function with the specified name exists.
 	 *
-	 * @param name the name of the function
+	 * @param name     the name of the function
+	 * @param category category of function
 	 * @return true if a function with the specified name exists, false otherwise
 	 */
-	boolean existsByName(String name);
+	boolean existsByNameAndCategory(String name, Category category);
 
 	/**
 	 * Finds all functions by their module ID.
@@ -75,11 +77,13 @@ public interface FunctionRepository extends JpaRepository<Function, UUID> {
 	 * @return a list of functions in the specified module
 	 */
 	List<Function> findAllByModule(Module module);
-	
+
 	/**
-	 * This method is used to find functions that were created or updated after the specified timestamps.
+	 * This method is used to find functions that were created or updated after the
+	 * specified timestamps.
+	 * 
 	 * @param createdDate the timestamp after which functions were created
-	 * @param updatedAt the timestamp after which functions were updated
+	 * @param updatedAt   the timestamp after which functions were updated
 	 * @return a list of functions that match the criteria
 	 */
 	List<Function> findByCreatedDateAfterOrUpdatedAtAfter(Instant createdDate, Instant updatedAt);

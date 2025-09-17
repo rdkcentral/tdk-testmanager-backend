@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -20,6 +20,11 @@ http://www.apache.org/licenses/LICENSE-2.0
 package com.rdkm.tdkservice.config;
 
 import java.util.concurrent.Executor;
+import java.io.File;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.rdkm.tdkservice.service.utilservices.CommonService;
+import com.rdkm.tdkservice.config.AppConfig;
+import com.rdkm.tdkservice.util.Constants;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,6 +39,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @EnableAsync
 public class AsyncConfig {
 
+	@Autowired
+	private CommonService commonService;
+
 	/**
 	 * Creates a ThreadPoolTaskExecutor bean that is used to execute tasks
 	 * asynchronously. Mainly for the execution triggers.
@@ -44,11 +52,31 @@ public class AsyncConfig {
 	public Executor taskExecutor() {
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
 
-		executor.setCorePoolSize(50); // Start with 50 threads immediately
-		executor.setMaxPoolSize(100); // Allow it to scale up to 100 threads if needed
-		executor.setQueueCapacity(10); // Allow only 10 tasks to queue before new threads are created (up to
-										// maxPoolSize)
+		// Default values
+		int corePoolSize = 50;
+		int maxPoolSize = 100;
+		int queueCapacity = 10;
 
+		try {
+			String configFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
+					+ Constants.TM_CONFIG_FILE;
+			File configFile = new File(configFilePath);
+			String corePoolSizeStr = commonService.getConfigProperty(configFile, "threadpool.corePoolSize");
+			String maxPoolSizeStr = commonService.getConfigProperty(configFile, "threadpool.maxPoolSize");
+			String queueCapacityStr = commonService.getConfigProperty(configFile, "threadpool.queueCapacity");
+			if (corePoolSizeStr != null)
+				corePoolSize = Integer.parseInt(corePoolSizeStr);
+			if (maxPoolSizeStr != null)
+				maxPoolSize = Integer.parseInt(maxPoolSizeStr);
+			if (queueCapacityStr != null)
+				queueCapacity = Integer.parseInt(queueCapacityStr);
+		} catch (Exception e) {
+			System.err.println("Could not load thread pool config from tm.config, using defaults: " + e.getMessage());
+		}
+
+		executor.setCorePoolSize(corePoolSize);
+		executor.setMaxPoolSize(maxPoolSize);
+		executor.setQueueCapacity(queueCapacity);
 		executor.setThreadNamePrefix("Automation-");
 		executor.initialize();
 		return executor;

@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -518,7 +518,7 @@ public class ModuleService implements IModuleService {
 			// Find function by name (if present)
 			Function function = null;
 			if (functionName != null && !functionName.isEmpty()) {
-				function = functionRepository.findByName(functionName);
+				function = functionRepository.findByNameAndCategory(functionName, module.getCategory());
 			}
 
 			PrimitiveTest primitiveTest = primitiveTestMap.get(testName);
@@ -776,7 +776,7 @@ public class ModuleService implements IModuleService {
 					function = new Function();
 					function.setName(functionName);
 					function.setId(UUID.fromString(functionId));
-
+					function.setCategory(module.getCategory());
 					function.setModule(module);
 					function = functionRepository.save(function);
 					functionRepository.flush();

@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -21,6 +21,7 @@ package com.rdkm.tdkservice.serviceimpl;
 
 import static com.rdkm.tdkservice.util.Constants.DEVICE_FILE_EXTENSION_ZIP;
 import static com.rdkm.tdkservice.util.Constants.DEVICE_XML_FILE_EXTENSION;
+import com.rdkm.tdkservice.exception.UserInputException;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -127,6 +128,9 @@ public class DeviceService implements IDeviceService {
 	@Autowired
 	private ScriptExecutorService scriptExecutorService;
 
+	@Autowired
+	private DeviceConfigService deviceConfigService;
+
 	/**
 	 * This method is used to create a new device. It receives a POST request at the
 	 * "/createDevice" endpoint with a DeviceDTO object in the request body. The
@@ -158,6 +162,11 @@ public class DeviceService implements IDeviceService {
 		// call setPropetietsCreateDTO meeethod here
 		setDevicePropertiesFromCreateDTO(device, deviceCreateDTO);
 		// save device return true if save success otherwise return false
+		// Fetch and assign live status before saving
+		DeviceStatus liveStatus = deviceStatusService.fetchDeviceStatus(device);
+		if (liveStatus != null) {
+			device.setDeviceStatus(liveStatus);
+		}
 		Device savedDevice = deviceRepository.save(device);
 
 		// save device return true if save success otherwise return false
@@ -181,6 +190,10 @@ public class DeviceService implements IDeviceService {
 		LOGGER.info("Going to update Device with id: " + deviceUpdateDTO.getId());
 		Device device = deviceRepository.findById(deviceUpdateDTO.getId())
 				.orElseThrow(() -> new ResourceNotFoundException("Device Id", deviceUpdateDTO.getId().toString()));
+		// Prevent update if device is IN_USE
+		if (device.getDeviceStatus() == DeviceStatus.IN_USE) {
+			throw new UserInputException("Device is in use, you can't update");
+		}
 		if (!Utils.isEmpty(deviceUpdateDTO.getDeviceIp())) {
 			if ((deviceRepository.existsByIp(deviceUpdateDTO.getDeviceIp()))
 					&& !(deviceUpdateDTO.getDeviceIp().equals(device.getIp()))) {
@@ -216,6 +229,11 @@ public class DeviceService implements IDeviceService {
 		MapperUtils.updateDeviceProperties(device, deviceUpdateDTO);
 		setDevicePropertiesFromUpdateDTO(device, deviceUpdateDTO);
 		try {
+			// Fetch and assign live status before saving
+			DeviceStatus liveStatus = deviceStatusService.fetchDeviceStatus(device);
+			if (liveStatus != null) {
+				device.setDeviceStatus(liveStatus);
+			}
 			deviceRepository.save(device);
 		} catch (Exception e) {
 			LOGGER.error("Error occurred while updating Device with id: " + deviceUpdateDTO.getId(), e);
@@ -280,7 +298,17 @@ public class DeviceService implements IDeviceService {
 	@Override
 	public boolean deleteDeviceById(UUID id) {
 		LOGGER.info("Going to delete Device with id: " + id);
+		Device device = deviceRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Device Id", id.toString()));
+		// Prevent delete if device is IN_USE
+		if (device.getDeviceStatus() == DeviceStatus.IN_USE) {
+			throw new UserInputException("Device is in use, you can't delete");
+		}
 		try {
+			// Delete config file first
+			String configFileName = deviceConfigService.getDeviceConfigFileName(device.getName(),
+					device.getDeviceType().getName(), device.isThunderEnabled());
+			deviceConfigService.deleteDeviceConfigFile(configFileName, device.isThunderEnabled());
 			// Then, delete the device
 			deviceRepository.deleteById(id);
 			return true;

@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -230,10 +230,11 @@ public class ExecutionAnalysisController {
 	@ApiResponses(value = { @ApiResponse(responseCode = "200", description = "Project ID is a platform project ID"),
 			@ApiResponse(responseCode = "200", description = "Project ID is not a platform project ID") })
 	@GetMapping("/isPlatformProjectID")
-	public ResponseEntity<DataResponse> isPlatformProjectID(@RequestParam String projectID,@RequestParam String category) {
+	public ResponseEntity<DataResponse> isPlatformProjectID(@RequestParam String projectID,
+			@RequestParam String category) {
 		LOGGER.info("Going to check if the project ID is a platform project ID");
 		String isPlatformProjectID = executionAnalysisService.getProjectCategory(projectID, category);
-		if (null != isPlatformProjectID ) {
+		if (null != isPlatformProjectID) {
 			LOGGER.info("Project ID is a platform project ID");
 			return ResponseUtils.getSuccessDataResponse("Project ID is a platform project ID", isPlatformProjectID);
 		} else {
@@ -497,7 +498,7 @@ public class ExecutionAnalysisController {
 		String response = executionAnalysisService.createJiraTicket(ticketCreateDTO);
 		if (response != null) {
 			LOGGER.info("Jira ticket created successfully");
-			return ResponseUtils.getSuccessDataResponse("Jira ticket created successfully", response); 
+			return ResponseUtils.getSuccessDataResponse("Jira ticket created successfully", response);
 		} else {
 			LOGGER.error("Failed to create Jira ticket");
 			throw new TDKServiceException("Failed to create Jira ticket");
@@ -569,7 +570,7 @@ public class ExecutionAnalysisController {
 			return ResponseUtils.getNotFoundDataConfigResponse("AnalysisDefectType not available", analysisDefectType);
 		}
 	}
-	
+
 	/**
 	 * Endpoint to get the RDK version.
 	 *
@@ -591,6 +592,5 @@ public class ExecutionAnalysisController {
 			return ResponseUtils.getNotFoundDataConfigResponse("RDK version not available", rdkVersion);
 		}
 	}
-	
 
 }

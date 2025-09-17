@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -988,23 +988,23 @@ public class ExportExcelService implements IExportExcelService {
 				for (Map<String, Object> scriptData : moduleScripts) {
 					ExecutionResultStatus status = (ExecutionResultStatus) scriptData.get("status");
 					switch (status) {
-					case SUCCESS:
-						success++;
-						break;
-					case FAILURE:
-						failure++;
-						break;
-					case TIMEOUT:
-						timeout++;
-						break;
-					case NA:
-						notApplicable++;
-						break;
-					case SKIPPED:
-						skipped++;
-						break;
-					default:
-						LOGGER.warn("Unknown result status: {}", status);
+						case SUCCESS:
+							success++;
+							break;
+						case FAILURE:
+							failure++;
+							break;
+						case TIMEOUT:
+							timeout++;
+							break;
+						case NA:
+							notApplicable++;
+							break;
+						case SKIPPED:
+							skipped++;
+							break;
+						default:
+							LOGGER.warn("Unknown result status: {}", status);
 					}
 				}
 
@@ -1230,10 +1230,11 @@ public class ExportExcelService implements IExportExcelService {
 		Map<String, Map<String, ExecutionResult>> prioritizedResults = new LinkedHashMap<>();
 
 		// Validate device details
-//		if (!validateDeviceIPs(executionIds)) {
-//			LOGGER.warn("Devices across executions do not have the same IP address. Skipping comparison.");
-//			return resultDataList;
-//		}
+		// if (!validateDeviceIPs(executionIds)) {
+		// LOGGER.warn("Devices across executions do not have the same IP address.
+		// Skipping comparison.");
+		// return resultDataList;
+		// }
 
 		// Fetch and prioritize execution results
 		for (UUID executionId : executionIds) {
@@ -1772,12 +1773,12 @@ public class ExportExcelService implements IExportExcelService {
 				Element function = doc.createElement("function");
 				function.setAttribute("name", functionName); // Use the functionName directly for the attribute.
 
-// Extract individual details from getFunctionDetails
+				// Extract individual details from getFunctionDetails
 				String expectedResultDetail = String.valueOf(executionMethodResultInstance.getExpectedResult());
 				String actualResultDetail = String.valueOf(executionMethodResultInstance.getActualResult());
 				String functionStatusDetail = String.valueOf(executionMethodResultInstance.getMethodResult());
 
-// Map each detail to XML child nodes
+				// Map each detail to XML child nodes
 				Element expectedResult = doc.createElement("expectedResult");
 				expectedResult.appendChild(doc.createTextNode(expectedResultDetail));
 				function.appendChild(expectedResult);

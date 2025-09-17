@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -83,14 +83,15 @@ public interface ParameterRepository extends JpaRepository<Parameter, UUID> {
 	 * @return
 	 */
 	Parameter findByNameAndFunction(String name, Function function);
-	
+
 	/**
-	 * This method is used to find parameters that were created or updated after the specified timestamps.
+	 * This method is used to find parameters that were created or updated after the
+	 * specified timestamps.
+	 * 
 	 * @param createdDate the timestamp after which parameters were created
-	 * @param updatedAt the timestamp after which parameters were updated
+	 * @param updatedAt   the timestamp after which parameters were updated
 	 * @return a list of parameters that match the criteria
 	 */
 	List<Parameter> findByCreatedDateAfterOrUpdatedAtAfter(Instant createdDate, Instant updatedAt);
-
 
 }

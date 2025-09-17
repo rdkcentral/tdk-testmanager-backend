@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -40,6 +40,7 @@ import com.rdkm.tdkservice.dto.PrimitiveTestDTO;
 import com.rdkm.tdkservice.dto.PrimitiveTestNameAndIdDTO;
 import com.rdkm.tdkservice.dto.PrimitiveTestParameterDTO;
 import com.rdkm.tdkservice.dto.PrimitiveTestUpdateDTO;
+import com.rdkm.tdkservice.enums.Category;
 import com.rdkm.tdkservice.enums.ParameterDataType;
 import com.rdkm.tdkservice.exception.DeleteFailedException;
 import com.rdkm.tdkservice.exception.ResourceAlreadyExistsException;
@@ -93,6 +94,10 @@ public class PrimitiveTestService implements IPrimitiveTestService {
 	@Override
 	public boolean createPrimitiveTest(PrimitiveTestCreateDTO primitiveTestDTO) {
 		LOGGER.info("Creating primitive test: " + primitiveTestDTO.toString());
+		Category category = Category.getCategory(primitiveTestDTO.getPrimitiveTestCategory());
+		if (null == category) {
+			throw new ResourceNotFoundException(Constants.CATEGORY, primitiveTestDTO.getPrimitiveTestCategory());
+		}
 		if (primitiveTestRepository.existsByName(primitiveTestDTO.getPrimitiveTestname())) {
 			LOGGER.info("Primitive test already exists with the same name: " + primitiveTestDTO.getPrimitiveTestname());
 			throw new ResourceAlreadyExistsException(Constants.PRIMITIVE_TEST_NAME,
@@ -103,7 +108,8 @@ public class PrimitiveTestService implements IPrimitiveTestService {
 			LOGGER.error("Module not found with the name: " + primitiveTestDTO.getPrimitiveTestModuleName());
 			throw new ResourceNotFoundException(Constants.MODULE_NAME, primitiveTestDTO.getPrimitiveTestModuleName());
 		}
-		Function function = functionRepository.findByName(primitiveTestDTO.getPrimitiveTestfunctionName());
+		Function function = functionRepository.findByNameAndCategory(primitiveTestDTO.getPrimitiveTestfunctionName(),
+				category);
 		if (function == null) {
 			LOGGER.error("Function not found with the name: " + primitiveTestDTO.getPrimitiveTestfunctionName());
 			throw new ResourceNotFoundException(Constants.FUNCTION_NAME,
@@ -258,7 +264,8 @@ public class PrimitiveTestService implements IPrimitiveTestService {
 					primitiveTestParameterRepository.save(primitiveTestParameter);
 				} else {
 					// If the parameter is not present, create a new PrimitiveTestParameter
-					Parameter parameter = parameterRepository.findByName(parameterValueDTO.getParameterName());
+					Parameter parameter = parameterRepository
+							.findByNameAndFunction(parameterValueDTO.getParameterName(), primitiveTest.getFunction());
 					PrimitiveTestParameter primitiveTestParameterDetails = new PrimitiveTestParameter();
 					primitiveTestParameterDetails.setPrimitiveTest(primitiveTest);
 					primitiveTestParameterDetails.setParameterName(parameterValueDTO.getParameterName());
@@ -269,6 +276,7 @@ public class PrimitiveTestService implements IPrimitiveTestService {
 				}
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
 			LOGGER.error("Error in updating primitive test data: " + e.getMessage());
 			return false;
 		}

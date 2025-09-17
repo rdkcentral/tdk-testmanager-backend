@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -52,8 +52,9 @@ public interface ExecutionScheduleRepository extends JpaRepository<ExecutionSche
 	List<ExecutionSchedule> findAllByCategory(Category category);
 
 	/**
-	 * This method is used to check the existence of the execution by name 
+	 * This method is used to check the existence of the execution by name
 	 * and device.
+	 * 
 	 * @param executionTime
 	 * @param string
 	 * @return

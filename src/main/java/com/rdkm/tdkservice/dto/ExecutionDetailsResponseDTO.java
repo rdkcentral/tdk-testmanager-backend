@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -86,7 +86,7 @@ public class ExecutionDetailsResponseDTO {
 	 * The real execution time for executing the scripts
 	 */
 	private double realExecutionTime;
-	
+
 	/*
 	 * * Indicates whether the device is a Thunder-enabled device.
 	 */
@@ -97,12 +97,12 @@ public class ExecutionDetailsResponseDTO {
 	 * object.
 	 */
 	private ExecutionSummaryResponseDTO summary;
-	
+
 	/**
 	 * A map of detailed execution summaries, where the key is a string identifier
 	 * and the value is an ExecutionSummaryResponseDTO object.
 	 */
-	private Map<String ,ExecutionSummaryResponseDTO> detailMap;
+	private Map<String, ExecutionSummaryResponseDTO> detailMap;
 
 	/**
 	 * A list of detailed execution results, each encapsulated in an

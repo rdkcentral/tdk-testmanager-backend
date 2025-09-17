@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -26,21 +26,20 @@ import lombok.Data;
  */
 @Data
 public class DeploymentLogsDTO {
-    
+
     /**
      * Status code of the response
      */
     private int statusCode;
-    
+
     /**
      * Path of the log file
      */
     private String logFilePath;
-    
+
     /**
      * Content of the log file
      */
     private String logContent;
-    
 
 }

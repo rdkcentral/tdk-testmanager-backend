@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -311,10 +311,10 @@ public class Constants {
 	// config file path
 	public static final String RDK_CERTIFICATION_CONFIG_PATH = "rdkCertificationConfigs";
 	// Header finder to add HEader template
-	public static final String HEADER_FINDER = "If not stated otherwise in this file or this component's Licenses.txt";
+	public static final String HEADER_FINDER = "If not stated otherwise in this file or this component's LICENSE";
 	// Header template
 	public static final String HEADER_TEMPLATE = "##########################################################################\r\n"
-			+ "# If not stated otherwise in this file or this component's Licenses.txt\r\n"
+			+ "# If not stated otherwise in this file or this component's LICENSE\r\n"
 			+ "# file the following copyright and licenses apply:\r\n" + "#\r\n"
 			+ "# Copyright CURRENT_YEAR RDK Management\r\n" + "#\r\n"
 			+ "# Licensed under the Apache License, Version 2.0 (the \"License\");\r\n"

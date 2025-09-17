@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -383,24 +383,24 @@ public class ExecutionAnalysisService implements IExecutionAnalysisService {
 	private void setAnalysisSummaryCount(AnalysisIssueTypewiseSummaryDTO analysisIssueTypewiseSummaryDTO,
 			AnalysisDefectType analysisDefectType) {
 		switch (analysisDefectType) {
-		case RDK_ISSUE:
-			analysisIssueTypewiseSummaryDTO.setRdkIssue(analysisIssueTypewiseSummaryDTO.getRdkIssue() + 1);
-			break;
-		case SCRIPT_ISSUE:
-			analysisIssueTypewiseSummaryDTO.setScriptIssue(analysisIssueTypewiseSummaryDTO.getScriptIssue() + 1);
-			break;
-		case INTERFACE_CHANGE:
-			analysisIssueTypewiseSummaryDTO
-					.setInterfaceChange(analysisIssueTypewiseSummaryDTO.getInterfaceChange() + 1);
-			break;
-		case ENV_ISSUE:
-			analysisIssueTypewiseSummaryDTO.setEnvIssue(analysisIssueTypewiseSummaryDTO.getEnvIssue() + 1);
-			break;
-		case OTHER_ISSUE:
-			analysisIssueTypewiseSummaryDTO.setOtherIssue(analysisIssueTypewiseSummaryDTO.getOtherIssue() + 1);
-			break;
-		default:
-			break;
+			case RDK_ISSUE:
+				analysisIssueTypewiseSummaryDTO.setRdkIssue(analysisIssueTypewiseSummaryDTO.getRdkIssue() + 1);
+				break;
+			case SCRIPT_ISSUE:
+				analysisIssueTypewiseSummaryDTO.setScriptIssue(analysisIssueTypewiseSummaryDTO.getScriptIssue() + 1);
+				break;
+			case INTERFACE_CHANGE:
+				analysisIssueTypewiseSummaryDTO
+						.setInterfaceChange(analysisIssueTypewiseSummaryDTO.getInterfaceChange() + 1);
+				break;
+			case ENV_ISSUE:
+				analysisIssueTypewiseSummaryDTO.setEnvIssue(analysisIssueTypewiseSummaryDTO.getEnvIssue() + 1);
+				break;
+			case OTHER_ISSUE:
+				analysisIssueTypewiseSummaryDTO.setOtherIssue(analysisIssueTypewiseSummaryDTO.getOtherIssue() + 1);
+				break;
+			default:
+				break;
 
 		}
 

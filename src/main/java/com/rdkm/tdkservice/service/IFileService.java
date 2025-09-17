@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -97,9 +97,11 @@ public interface IFileService {
 	Resource downloadAgentLogFile(String executionResId);
 
 	/**
-	 * Retrieves a list of crash log file names associated with the specified execution result ID.
+	 * Retrieves a list of crash log file names associated with the specified
+	 * execution result ID.
 	 *
-	 * @param executionResultId the ID of the execution result for which to retrieve crash log file names
+	 * @param executionResultId the ID of the execution result for which to retrieve
+	 *                          crash log file names
 	 * @return a list of crash log file names
 	 */
 	List<String> getCrashLogFileNames(String executionResultId);
@@ -107,17 +109,21 @@ public interface IFileService {
 	/**
 	 * Downloads the crash log file for a given execution result ID and file name.
 	 *
-	 * @param executionResId the ID of the execution result for which the crash log file is to be downloaded
-	 * @param fileName the name of the crash log file to be downloaded
+	 * @param executionResId the ID of the execution result for which the crash log
+	 *                       file is to be downloaded
+	 * @param fileName       the name of the crash log file to be downloaded
 	 * @return a Resource representing the downloaded crash log file
 	 */
 	Resource downloadCrashLogFile(String executionResId, String fileName);
-	
+
 	/**
-	 * Retrieves additional logs from a specified log file associated with a given execution result ID.
+	 * Retrieves additional logs from a specified log file associated with a given
+	 * execution result ID.
 	 *
-	 * @param logFileName the name of the log file from which to retrieve additional logs
-	 * @param executionResultID the ID of the execution result for which to retrieve additional logs
+	 * @param logFileName       the name of the log file from which to retrieve
+	 *                          additional logs
+	 * @param executionResultID the ID of the execution result for which to retrieve
+	 *                          additional logs
 	 * @return a string containing the additional logs
 	 */
 	String getAdditionalLogs(String logFileName, String executionResultID);

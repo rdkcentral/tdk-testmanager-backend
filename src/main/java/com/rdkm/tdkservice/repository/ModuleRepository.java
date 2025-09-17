@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -70,14 +70,15 @@ public interface ModuleRepository extends JpaRepository<Module, UUID> {
 	 * @return a list of all modules
 	 */
 	List<Module> findAll();
-	
+
 	/**
-	 * This method is used to find modules that were created or updated after the specified timestamps.
+	 * This method is used to find modules that were created or updated after the
+	 * specified timestamps.
+	 * 
 	 * @param createdDate the timestamp after which modules were created
-	 * @param updatedAt the timestamp after which modules were updated
+	 * @param updatedAt   the timestamp after which modules were updated
 	 * @return a list of modules that match the criteria
 	 */
 	List<Module> findByCreatedDateAfterOrUpdatedAtAfter(Instant createdDate, Instant updatedAt);
-
 
 }

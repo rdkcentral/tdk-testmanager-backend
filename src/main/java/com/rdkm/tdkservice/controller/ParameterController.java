@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -189,9 +189,10 @@ public class ParameterController {
 	}
 
 	/**
-	 * Retrieves all parameters by function name.
+	 * Retrieves all parameters by function name and category.
 	 *
 	 * @param functionName the name of the function
+	 * @param category     the category of the function
 	 * @return ResponseEntity with a list of all parameters
 	 */
 	@Operation(summary = "Retrieve all parameters by function name", description = "Retrieves a list of all parameters by function name.")
@@ -200,9 +201,10 @@ public class ParameterController {
 			@ApiResponse(responseCode = "401", description = "Unauthorized"),
 			@ApiResponse(responseCode = "500", description = "Internal server error") })
 	@GetMapping("/findAllByFunction")
-	public ResponseEntity<DataResponse> findAllParametersByFunction(@RequestParam String functionName) {
-		LOGGER.info("Retrieving all parameters by function name: {}", functionName);
-		List<ParameterDTO> parameters = parameterService.findAllParametersByFunction(functionName);
+	public ResponseEntity<DataResponse> findAllParametersByFunction(@RequestParam String functionName,
+			@RequestParam String category) {
+		LOGGER.info("Retrieving all parameters by function name: {} and category:{}", functionName, category);
+		List<ParameterDTO> parameters = parameterService.findAllParametersByFunction(functionName, category);
 		if (parameters != null && !parameters.isEmpty()) {
 			LOGGER.info("Successfully retrieved all parameters by function name: {}", functionName);
 			return ResponseUtils.getSuccessDataResponse("Parameters fetched successfully", parameters);

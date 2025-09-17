@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -30,12 +30,12 @@ public class ExecutionByDateDTO {
 	 * Represent the execution name
 	 */
 	private String executionName;
-	
+
 	/*
 	 * Represent the execution date
 	 */
 	private Instant executionDate;
-	
+
 	/*
 	 * Represent the execution status
 	 */

@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -123,7 +123,7 @@ public interface IExecutionService {
 	 * @return an ExecutionDetailsResponseDTO containing the details of the
 	 *         execution
 	 */
-	ExecutionDetailsResponseDTO getExecutionDetails(UUID id ,String execName);
+	ExecutionDetailsResponseDTO getExecutionDetails(UUID id, String execName);
 
 	/**
 	 * Retrieves the execution result for the given execution result ID.
@@ -148,7 +148,7 @@ public interface IExecutionService {
 	 * @param execId the unique identifier of the execution to be aborted
 	 * @return true if the execution was successfully aborted, false otherwise
 	 */
-	boolean abortExecution(UUID execId ,String execName);
+	boolean abortExecution(UUID execId, String execName);
 
 	/**
 	 * Determines whether the execution with the specified ID should be repeated.
@@ -256,7 +256,7 @@ public interface IExecutionService {
 	 * @param executionId - the execution id
 	 * @return the module wise summary
 	 */
-	Map<String, ExecutionSummaryResponseDTO> getModulewiseExecutionSummary(UUID executionId ,String execName);
+	Map<String, ExecutionSummaryResponseDTO> getModulewiseExecutionSummary(UUID executionId, String execName);
 
 	/**
 	 * Deletes executions within the specified date range.
@@ -358,7 +358,7 @@ public interface IExecutionService {
 	 *         performed on the specified date
 	 */
 	List<ExecutionByDateDTO> getExecutionByDate(String date);
-	
+
 	/**
 	 * Retrieves the execution timeout for a specific script.
 	 *
@@ -366,4 +366,15 @@ public interface IExecutionService {
 	 * @return the execution timeout in seconds, or null if the script is not found
 	 */
 	Integer getScriptExecutionTimeout(String scriptName);
+
+	/**
+	 * Get all executions by status, with optional category and pagination.
+	 * 
+	 * @param status       execution status (e.g., RUNNING, COMPLETED, FAILED)
+	 * @param categoryName category name (optional)
+	 * @param page         page number (optional)
+	 * @param size         page size (optional)
+	 * @return List of ExecutionListDTO
+	 */
+	List<ExecutionListDTO> getAllExecutionByStatus(String status, String categoryName, int page, int size);
 }

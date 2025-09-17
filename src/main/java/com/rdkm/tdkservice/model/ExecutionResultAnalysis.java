@@ -1,5 +1,5 @@
 /*
- * If not stated otherwise in this file or this component's Licenses.txt file the
+ * If not stated otherwise in this file or this component's LICENSE file the
  * following copyright and licenses apply:
  *
  * Copyright 2024 RDK Management
@@ -30,7 +30,8 @@ import lombok.EqualsAndHashCode;
 
 /**
  * Entity representing the analysis of an execution result.
- * This class extends BaseEntity and uses Lombok annotations for boilerplate code generation.
+ * This class extends BaseEntity and uses Lombok annotations for boilerplate
+ * code generation.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

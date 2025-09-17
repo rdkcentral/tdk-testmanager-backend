@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -526,5 +526,51 @@ public class ScriptController {
 		Integer timeout = scriptService.getModuleScriptTimeout(moduleName);
 		LOGGER.info("Module execution time fetched successfully for module: " + moduleName);
 		return ResponseUtils.getSuccessDataResponse("Module execution time fetched successfully", timeout);
+	}
+
+	/**
+	 * Download all markdown files by category, organized by module folders in a
+	 * ZIP.
+	 * 
+	 * @param category the category name
+	 * @return ResponseEntity containing the ZIP file
+	 */
+	@Operation(summary = "Download Markdown Files by Category as ZIP", description = "Download all markdown files by category, organized by module folders in a ZIP archive")
+	@ApiResponse(responseCode = "200", description = "ZIP file downloaded successfully")
+	@ApiResponse(responseCode = "500", description = "Error in downloading markdown ZIP")
+	@GetMapping("/downloadMarkdownByCategoryZip")
+	public ResponseEntity<?> downloadMarkdownByCategoryZip(@RequestParam String category) {
+		LOGGER.info("Received request to download markdown files by category as ZIP: {}", category);
+		ByteArrayInputStream zipStream = scriptService.downloadMarkdownByCategoryZip(category);
+		if (zipStream == null || zipStream.available() == 0) {
+			LOGGER.error("Markdown ZIP file not found or empty for category: {}", category);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error in downloading markdown ZIP");
+		}
+		return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + category + "_scripts_markdown.zip")
+				.contentType(MediaType.parseMediaType("application/zip"))
+				.body(new InputStreamResource(zipStream));
+	}
+
+	/**
+	 * This method is used to download all script markdown files as a ZIP.
+	 *
+	 * @return ResponseEntity containing the ZIP file
+	 */
+	@Operation(summary = "Download All Markdown Files as ZIP", description = "Download all script markdown files as a ZIP archive")
+	@ApiResponse(responseCode = "200", description = "ZIP file downloaded successfully")
+	@ApiResponse(responseCode = "500", description = "Error in downloading markdown ZIP")
+	@GetMapping("/downloadAllMarkdownZip")
+	public ResponseEntity<?> downloadAllMarkdownZip() {
+		LOGGER.info("Received request to download all markdown files as ZIP");
+		ByteArrayInputStream zipStream = scriptService.downloadAllMarkdownFilesZip();
+		if (zipStream == null || zipStream.available() == 0) {
+			LOGGER.error("Markdown ZIP file not found or empty");
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error in downloading markdown ZIP");
+		}
+		return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=all_scripts_markdown.zip")
+				.contentType(MediaType.parseMediaType("application/zip"))
+				.body(new InputStreamResource(zipStream));
 	}
 }

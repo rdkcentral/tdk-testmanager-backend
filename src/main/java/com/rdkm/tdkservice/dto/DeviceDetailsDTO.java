@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -24,40 +24,36 @@ import java.util.ArrayList;
 import lombok.Data;
 
 /**
- * CIDeviceDTO is a Data Transfer Object that represents a device with its details.
- * It contains information about the device, its type, image name, component level details, and system level details.
+ * CIDeviceDTO is a Data Transfer Object that represents a device with its
+ * details. It contains information about the device, its type, image name,
+ * component level details, and system level details.
  */
 @Data
 public class DeviceDetailsDTO {
-    
-    /**
-     * The name of the device.
-     */
-    public String device;
-    
+
 	/**
-	 * The name of the device where execution happen.
+	 * The name of the device.
 	 */
-    private String deviceName;
-  
-    /**
-     * The type of the device.
-     */
-    public String deviceType;
-   
-    /**
-     * The name of the image associated with the device.
-     */
-    public String imageName;
-   
-    /**
-     * A list of component level details for the device.
-     */
-    public ArrayList<ComponentLevelDTO> componentLevelDetails;
-   
-    /**
-     * A list of system level details for the device.
-     */
-    public ArrayList<Object> systemLevelDetails;
+	public String device;
+
+	/**
+	 * The type of the device.
+	 */
+	public String deviceType;
+
+	/**
+	 * The name of the image associated with the device.
+	 */
+	public String imageName;
+
+	/**
+	 * A list of component level details for the device.
+	 */
+	public ArrayList<ComponentLevelDTO> componentLevelDetails;
+
+	/**
+	 * A list of system level details for the device.
+	 */
+	public ArrayList<Object> systemLevelDetails;
 
 }

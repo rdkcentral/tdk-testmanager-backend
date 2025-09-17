@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -163,7 +163,8 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		String fileName = uploadFile.getOriginalFilename();
 		isValidFileType(type, fileName);
 
-		//Validation added to upload only packages that are applicable to particular device soc
+		// Validation added to upload only packages that are applicable to particular
+		// device soc
 		Device deviceObj = validateDeviceAndSoc(device);
 		String regex = "(?i)" + type + "_Package_" + deviceObj.getSoc().getName().toLowerCase() + "_.*$";
 		if (!fileName.matches(regex)) {
@@ -285,14 +286,15 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		LOGGER.info("vtsPackageVerificationCommand: " + Arrays.toString(vtsPackageVerificationCommand));
 		LOGGER.info("tdkPackageVerificationCommand: " + Arrays.toString(tdkPackageVerificationCommand));
 		try {
-			
+
 			// Execute the commands to copy the package file to the device root folder
 			scriptExecutorService.executeScript(copyPackageCommand, 300);
 			// Execute the commands to copy the shell script file to the device root folder
 			scriptExecutorService.executeScript(copyScriptCommand, 300);
-			//Execute the shellscript in device and writes the logs to the directory /opt/TDK/logs/tdk_agent.log
-			scriptExecutorService.executeScript(executeScriptCommand, 120);			
-			//cat output of the script execution logs
+			// Execute the shellscript in device and writes the logs to the directory
+			// /opt/TDK/logs/tdk_agent.log
+			scriptExecutorService.executeScript(executeScriptCommand, 120);
+			// cat output of the script execution logs
 			String output = scriptExecutorService.executeScript(logsCommand, 60);
 			LOGGER.info("Script output: {}", output);
 			PackageResponse installPackageResponse = new PackageResponse();
@@ -313,7 +315,7 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 					}
 
 				} else if (packageName.contains("tdk") || packageName.contains("TDK")) {
-					//Checks whether tdk agent status is Active
+					// Checks whether tdk agent status is Active
 					String tdkVerification = scriptExecutorService.executeScript(tdkPackageVerificationCommand, 0);
 					if (tdkVerification != null && !tdkVerification.isEmpty()) {
 						LOGGER.info("TDK Package installed successfully" + tdkVerification);
@@ -445,13 +447,13 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 	private String getScriptFile(String type, boolean isPackageInstallation, boolean isPackageCreation) {
 
 		switch (type.toUpperCase()) {
-		case Constants.TDK:
-			return isPackageInstallation ? "InstallTDKPackage.sh" : "createTDKPackage.sh";
-		case Constants.VTS:
-			return isPackageInstallation ? "InstallVTSPackage.sh" : "createVTSPackage.sh";
-		default:
-			LOGGER.error("Invalid package type: {}", type);
-			throw new UserInputException("Invalid package type: " + type);
+			case Constants.TDK:
+				return isPackageInstallation ? "InstallTDKPackage.sh" : "createTDKPackage.sh";
+			case Constants.VTS:
+				return isPackageInstallation ? "InstallVTSPackage.sh" : "createVTSPackage.sh";
+			default:
+				LOGGER.error("Invalid package type: {}", type);
+				throw new UserInputException("Invalid package type: " + type);
 		}
 	}
 

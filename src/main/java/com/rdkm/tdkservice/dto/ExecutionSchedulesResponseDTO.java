@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -35,12 +35,12 @@ public class ExecutionSchedulesResponseDTO {
 	 * The time at which the execution is scheduled to occur.
 	 */
 	private Instant executionTime;
-	
+
 	/**
 	 * The start time for the cron job.
 	 */
 	private Instant cronStartTime;
-	
+
 	/**
 	 * The end time for the cron job.
 	 */
