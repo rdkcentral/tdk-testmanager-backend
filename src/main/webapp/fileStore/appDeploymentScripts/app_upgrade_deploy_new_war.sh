@@ -1,3 +1,4 @@
+#!/bin/bash
 ##########################################################################
 # If not stated otherwise in this file or this component's LICENSE
 # file the following copyright and licenses apply:
@@ -17,7 +18,7 @@
 # limitations under the License.
 ##########################################################################
 
-#!/bin/bash
+
  
 # Usage: ./app_upgrade_deploy_new_war.sh {backupPath} {newWarPath}
  

@@ -17,7 +17,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #########################################################################
-# Default backup directory
 
 # Default backup directory
 default_backup_dir="/mnt/TM_BACKUP"
