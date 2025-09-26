@@ -55,6 +55,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
+import com.rdkm.tdkservice.response.Response;
+import com.rdkm.tdkservice.service.IDataRecoveryService;
+import com.rdkm.tdkservice.service.ILiquibaseService;
+
 /**
  * AppUpgradeController handles requests related to app upgrades
  */
@@ -70,6 +74,18 @@ public class AppUpGradeController {
 	 */
 	@Autowired
 	private IAppUpgradeService appUpgradeService;
+
+	/**
+	 * LiquibaseService bean for manual database migrations.
+	 */
+	@Autowired
+	private ILiquibaseService liquibaseService;
+
+	/**
+	 * DataRecoveryService bean for executing data recovery.
+	 */
+	@Autowired
+	private IDataRecoveryService dataRecoveryService;
 
 	/**
 	 * Exports change SQL based on the provided timestamp. This endpoint triggers
@@ -175,6 +191,61 @@ public class AppUpGradeController {
 		} else {
 			LOGGER.error("Failed to retrieve deployment logs");
 			throw new TDKServiceException("Error while retrieving deployment logs");
+		}
+	}
+
+	/**
+	 * API to execute Liquibase migrations manually
+	 * This endpoint allows you to run database migrations after deployment
+	 * without requiring the application to restart.
+	 * 
+	 * @return Response with migration status
+	 */
+	@Operation(summary = "Execute Liquibase database migrations")
+	@ApiResponses(value = {
+			@ApiResponse(responseCode = "200", description = "Migration Executed Successfully"),
+			@ApiResponse(responseCode = "500", description = "Migration Failed") })
+	@GetMapping("/runLiquibase")
+	public ResponseEntity<Response> runLiquibase() {
+		LOGGER.info("Manual Liquibase migration requested");
+		try {
+			String result = liquibaseService.executeMigrations();
+			LOGGER.info("Liquibase migration completed successfully");
+			return ResponseUtils.getSuccessResponse(result);
+		} catch (Exception e) {
+			LOGGER.error("Error during Liquibase migration: {}", e.getMessage(), e);
+			/**
+			 * The Liquibase migration can be failed due to various reasons like conflicts
+			 * in change sets, database connectivity issues, etc.
+			 * In such cases, it's crucial to inform the admin user to analyze the logs and
+			 * take necessary actions.
+			 * If it is due to conflicts in change sets, it is recommended to take a backup
+			 * of the current database state before attempting any recovery actions.
+			 * The admin user should also be made aware of the potential impact on the
+			 * application and data integrity. For more details, please refer to the release
+			 * migration
+			 * documentation
+			 * 
+			 */
+			throw new TDKServiceException(
+					"Migratuion failed. Admin user, Please analyse logs, take your data backup and use data recovery feature");
+		}
+	}
+
+	/**
+	 * API to execute data recovery
+	 * This endpoint allows you to recover data from a backup after a failed
+	 * migration.
+	 */
+	@GetMapping("/data-recovery/execute")
+	public ResponseEntity<?> executeDataRecovery() {
+		LOGGER.info("Data recovery execution requested");
+		try {
+			dataRecoveryService.executeDataRecovery();
+			return ResponseUtils.getSuccessResponse("Data recovery executed successfully");
+		} catch (Exception e) {
+			LOGGER.error("Error during data recovery: {}", e.getMessage(), e);
+			throw new TDKServiceException("Data recovery failed, Please check the logs");
 		}
 	}
 }

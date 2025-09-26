@@ -543,7 +543,9 @@ public class TestSuiteService implements ITestSuiteService {
 			LOGGER.error("No scripts found for the test suite: " + testSuite);
 			throw new ResourceNotFoundException(Constants.TEST_SUITE, testSuite);
 		}
-		List<Script> scriptList = new ArrayList<Script>();
+		// Sort by scriptOrder to preserve order in XML
+		scriptTestSuiteList.sort(Comparator.comparingInt(ScriptTestSuite::getScriptOrder));
+		List<Script> scriptList = new ArrayList<>();
 		for (ScriptTestSuite scriptTestSuite : scriptTestSuiteList) {
 			scriptList.add(scriptTestSuite.getScript());
 		}
