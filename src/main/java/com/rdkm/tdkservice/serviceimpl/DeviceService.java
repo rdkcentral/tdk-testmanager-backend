@@ -416,17 +416,15 @@ public class DeviceService implements IDeviceService {
 			deviceDTO.setDeviceIp(getNodeTextContent(eElement, Constants.XML_TAG_GATEWAY_IP));
 		}
 		// If the category is RDKC, set the STB name and IP from the camera name and IP
-		else if (deviceDTO.getCategory().equalsIgnoreCase(Category.RDKC.getName())) {
-			deviceDTO.setDeviceName(getNodeTextContent(eElement, Constants.XML_TAG_CAMERA_NAME));
-			deviceDTO.setDeviceIp(getNodeTextContent(eElement, Constants.XML_TAG_CAMERA_IP));
+		else if (deviceDTO.getCategory().equalsIgnoreCase(Category.RDKV.getName())) {
+			deviceDTO.setDeviceName(getNodeTextContent(eElement, Constants.XML_TAG_DEVICE_NAME));
+			deviceDTO.setDeviceIp(getNodeTextContent(eElement, Constants.XML_TAG_DEVICE_IP));
 		}
 
 		// Set the device name, IP, MAC ID, device type name, oem name, SoC
 		// name,
 		// thunder enabled status, thunder port, recorder ID, and gateway device name
 		// from the XML element
-		deviceDTO.setDeviceName(getNodeTextContent(eElement, Constants.XML_TAG_DEVICE_NAME));
-		deviceDTO.setDeviceIp(getNodeTextContent(eElement, Constants.XML_TAG_DEVICE_IP));
 		deviceDTO.setMacId(getNodeTextContent(eElement, Constants.XML_TAG_MAC_ADDR));
 		deviceDTO.setDeviceTypeName(getNodeTextContent(eElement, Constants.XML_TAG_Device_TYPE));
 		deviceDTO.setOemName(getNodeTextContent(eElement, Constants.XML_TAG_OEM));
