@@ -29,6 +29,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -201,6 +202,25 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<Response> handleDeleteFailedException(DeleteFailedException ex) {
 		Response errorResponse = new Response(ex.getMessage(), HttpStatus.CONFLICT.value());
 		return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+	}
+
+	/**
+	 * This method is used to handle the HttpRequestMethodNotSupportedException
+	 * and return the error response when an unsupported HTTP method is used
+	 * 
+	 * @param ex the HttpRequestMethodNotSupportedException
+	 * @return ResponseEntity with error details
+	 */
+	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+	public ResponseEntity<Response> handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+		logger.info("Method not supported: " + ex.getMessage());
+
+		String message = String.format("Request method '%s' not supported. Supported methods are: %s",
+				ex.getMethod(),
+				String.join(", ", ex.getSupportedMethods()));
+
+		Response errorResponse = new Response(message, HttpStatus.METHOD_NOT_ALLOWED.value());
+		return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(errorResponse);
 	}
 
 }

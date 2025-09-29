@@ -249,26 +249,6 @@ public class ScriptService implements IScriptService {
 			LOGGER.error("Error saving script with device types: " + e.getMessage());
 			e.printStackTrace();
 		}
-		if (null != savedScript) {
-			TestSuite testSuite = testSuiteRepository.findByName(module.getName());
-			if (null != testSuite) {
-				ScriptTestSuite scriptTestSuite = new ScriptTestSuite();
-				scriptTestSuite.setScript(savedScript);
-				scriptTestSuite.setTestSuite(testSuite);
-				scriptTestSuiteRepository.save(scriptTestSuite);
-				// scriptTestSuite.setScriptOrder(null);
-
-			} else {
-				TestSuiteCreateDTO testSuiteCreateDTO = new TestSuiteCreateDTO();
-				testSuiteCreateDTO.setName(module.getName());
-				testSuiteCreateDTO.setDescription("TestSuite For " + module.getName());
-				testSuiteCreateDTO.setCategory(category.getName());
-				List<ScriptListDTO> scriptListDTO = findAllScriptsByModule(module.getName());
-				testSuiteCreateDTO.setScripts(scriptListDTO);
-				testSuiteService.createTestSuite(testSuiteCreateDTO);
-
-			}
-		}
 
 		return null != savedScript;
 
@@ -534,44 +514,6 @@ public class ScriptService implements IScriptService {
 
 		List<ScriptModuleDTO> scriptModuleDTOList = new ArrayList<>();
 		// If no modules are found for the category, then throw an exception
-		if (modules.isEmpty()) {
-			LOGGER.error("No modules found for the category: " + category);
-			return null;
-		}
-
-		for (Module module : modules) {
-			List<ScriptListDTO> scripts = this.findAllScriptsByModule(module.getName());
-			ScriptModuleDTO moduleDTO = new ScriptModuleDTO();
-			moduleDTO.setModuleId(module.getId());
-			moduleDTO.setModuleName(module.getName());
-			moduleDTO.setScripts(scripts);
-			moduleDTO.setTestGroupName(module.getTestGroup().getName());
-			if (!moduleDTO.getScripts().isEmpty()) {
-				scriptModuleDTOList.add(moduleDTO);
-			}
-			LOGGER.info("Module: " + module.getName() + " added to the list");
-		}
-		return scriptModuleDTOList;
-	}
-
-	/**
-	 * This method is used to get all the scripts based on the module with the
-	 * category
-	 * 
-	 * @param category - the category
-	 * @return - the list of scripts based on the module with the category
-	 */
-	public List<ScriptModuleDTO> findAllScriptByModuleWithCategoryWise(String category) {
-		LOGGER.info("Getting all scripts based on the module");
-
-		// Get the category based on the category name
-		Category categoryValue = commonService.validateCategory(category);
-
-		// Get all the modules based on the category
-		List<Module> modules = moduleRepository.findAllByCategory(categoryValue);
-
-		List<ScriptModuleDTO> scriptModuleDTOList = new ArrayList<>();
-		// If no modules are found for the category, then throw an exceptiontttt
 		if (modules.isEmpty()) {
 			LOGGER.error("No modules found for the category: " + category);
 			return null;
@@ -1365,11 +1307,11 @@ public class ScriptService implements IScriptService {
 	 */
 	@Override
 	public void defaultTestSuiteCreationForExistingModule() {
-		String[] categories = { "RDKV", "RDKB", "RDKV_RDKSERVICE" };
+		String[] categories = { "RDKV", "RDKB", "RDKC" };
 
 		for (String category : categories) {
 
-			List<ScriptModuleDTO> scripts = findAllScriptByModuleWithCategoryWise(category);
+			List<ScriptModuleDTO> scripts = findAllScriptByModuleWithCategory(category);
 			if (scripts != null && !scripts.isEmpty()) {
 				for (ScriptModuleDTO scriptModuleDTO : scripts) {
 
@@ -1382,25 +1324,15 @@ public class ScriptService implements IScriptService {
 					if (testSuite == null) {
 						testSuiteService.createTestSuite(testSuiteCerateDTO);
 					} else {
-						// Check if script count differs before updating
-						int existingScriptCount = testSuite.getScriptTestSuite().size();
-						int currentScriptCount = scriptModuleDTO.getScripts().size();
-
-						if (existingScriptCount != currentScriptCount) {
-							TestSuiteDTO testSuiteDTO = new TestSuiteDTO();
-							testSuiteDTO.setId(testSuite.getId());
-							testSuiteDTO.setName(scriptModuleDTO.getModuleName());
-							testSuiteDTO.setDescription(testSuite.getDescription());
-							testSuiteDTO.setCategory(category);
-							testSuiteDTO.setScripts(scriptModuleDTO.getScripts());
-							testSuiteService.updateTestSuite(testSuiteDTO);
-							LOGGER.info("Test suite updated for module: {} - Script count changed from {} to {}",
-									scriptModuleDTO.getModuleName(), existingScriptCount, currentScriptCount);
-						} else {
-							LOGGER.info(
-									"Test suite for module: {} already has the same script count ({}), skipping update",
-									scriptModuleDTO.getModuleName(), existingScriptCount);
-						}
+						TestSuiteDTO testSuiteDTO = new TestSuiteDTO();
+						testSuiteDTO.setId(testSuite.getId());
+						testSuiteDTO.setName(scriptModuleDTO.getModuleName());
+						testSuiteDTO.setDescription(testSuite.getDescription());
+						testSuiteDTO.setCategory(category);
+						testSuiteDTO.setScripts(scriptModuleDTO.getScripts());
+						testSuiteService.updateTestSuite(testSuiteDTO);
+						LOGGER.info("Test suite already exists for the module, So updating: "
+								+ scriptModuleDTO.getModuleName());
 					}
 
 				}
