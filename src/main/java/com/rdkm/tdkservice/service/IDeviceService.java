@@ -176,4 +176,13 @@ public interface IDeviceService {
 	 */
 	String findDeviceDetailsByName(String deviceName);
 
+	/**
+	 * This method is used to change the IP address of a device by device name.
+	 * 
+	 * @param deviceName  The name of the device
+	 * @param newDeviceIp The new IP address to assign to the device
+	 * @return String JSON response for backward compatibility
+	 */
+	String changeDeviceIP(String deviceName, String newDeviceIp);
+
 }

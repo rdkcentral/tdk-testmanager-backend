@@ -23,10 +23,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -125,5 +127,27 @@ public class DevicePythonController {
 			LOGGER.error("No box type found with this IP");
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No box type found with this ip" + deviceIp);
 		}
+	}
+
+	/**
+	 * This method is used to change the IP address of a device by device name.
+	 * Backward compatible with the old Grails implementation.
+	 *
+	 * @param deviceName  The name of the device
+	 * @param newDeviceIP The new IP address for the device
+	 * @return ResponseEntity<String> JSON response for backward compatibility
+	 */
+	@Operation(summary = "Change device IP by device name", description = "Changes the IP address of a device using device name (backward compatible).")
+	@ApiResponse(responseCode = "200", description = "Device IP change response")
+	@ApiResponse(responseCode = "500", description = "Internal server error")
+	@GetMapping("/changeDeviceIP")
+	public ResponseEntity<String> changeDeviceIP(
+			@RequestParam String deviceName,
+			@RequestParam String newDeviceIP) {
+		LOGGER.info("Received change device IP request for device: {} to IP: {}", deviceName, newDeviceIP);
+		String result = deviceService.changeDeviceIP(deviceName, newDeviceIP);
+		return ResponseEntity.ok()
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(result);
 	}
 }

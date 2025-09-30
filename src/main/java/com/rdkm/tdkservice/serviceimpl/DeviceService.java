@@ -1095,4 +1095,60 @@ public class DeviceService implements IDeviceService {
 		}
 
 	};
+
+	/**
+	 * This method is used to change the IP address of a device by device name.
+	 * 
+	 * @param deviceName  The name of the device
+	 * @param newDeviceIp The new IP address to assign to the device
+	 * @return String JSON response for backward compatibility
+	 */
+	@Override
+	public String changeDeviceIP(String deviceName, String newDeviceIp) {
+		LOGGER.info("Changing device IP for device: {} to new IP: {}", deviceName, newDeviceIp);
+
+		JSONObject result = new JSONObject();
+
+		try {
+
+			if (deviceName == null || deviceName.trim().isEmpty() ||
+					newDeviceIp == null || newDeviceIp.trim().isEmpty()) {
+				result.put("Status", "FAILURE");
+				result.put("Remarks", "Device name or IP empty");
+				return result.toString();
+			}
+
+			// Find device by name (equivalent to Device.findByStbName)
+			Device deviceInstance = deviceRepository.findByName(deviceName);
+			if (deviceInstance == null) {
+				result.put("Status", "FAILURE");
+				result.put("Remarks", "Device not found");
+				return result.toString();
+			}
+
+			// Check if new IP already exists (equivalent to Device.findAllByStbIp)
+			if (deviceRepository.existsByIp(newDeviceIp)) {
+				result.put("Status", "FAILURE");
+				result.put("Remarks", "Device IP " + newDeviceIp + " already exists");
+				return result.toString();
+			}
+
+			// Update device IP
+			deviceInstance.setIp(newDeviceIp);
+
+			// Save the updated device instance
+			deviceRepository.save(deviceInstance);
+
+			result.put("Status", "SUCCESS");
+			result.put("Remarks", "Changed device IP to " + newDeviceIp);
+
+		} catch (Exception e) {
+			LOGGER.error("Error changing device IP for device: {} to {}: {}",
+					deviceName, newDeviceIp, e.getMessage());
+
+		}
+
+		return result.toString();
+	}
+
 }
