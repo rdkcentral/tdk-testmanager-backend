@@ -211,6 +211,11 @@ public class ScriptService implements IScriptService {
 		}
 		script.setModule(module);
 
+		if (module.getExecutionTime() < script.getExecutionTimeOut()) {
+			LOGGER.error("Script execution time out cannot be greater than module execution time");
+			throw new UserInputException("Script execution time out cannot be greater than module execution time");
+		}
+
 		// Set the category based on the module
 		Category category = this.getCategoryBasedOnModule(module);
 		script.setCategory(category);
@@ -332,6 +337,11 @@ public class ScriptService implements IScriptService {
 		}
 		script.setModule(module);
 
+		if (module.getExecutionTime() < scriptUpdateDTO.getExecutionTimeOut()) {
+			LOGGER.error("Script execution time out cannot be greater than module execution time");
+			throw new UserInputException("Script execution time out cannot be greater than module execution time");
+		}
+
 		// Set the category based on the module
 		Category category = this.getCategoryBasedOnModule(module);
 		script.setCategory(category);
@@ -367,7 +377,7 @@ public class ScriptService implements IScriptService {
 		}
 
 		// Set devicetypes in the script entity if the devicetypes are updated
-		if (null != scriptUpdateDTO.getDeviceTypes() && !scriptUpdateDTO.getDeviceTypes().isEmpty()) {
+		if (null != scriptUpdateDTO.getDeviceTypes() || !scriptUpdateDTO.getDeviceTypes().isEmpty()) {
 			List<DeviceType> deviceType = this.getScriptDevicetypes(scriptUpdateDTO.getDeviceTypes(),
 					script.getCategory());
 			script.setDeviceTypes(deviceType);

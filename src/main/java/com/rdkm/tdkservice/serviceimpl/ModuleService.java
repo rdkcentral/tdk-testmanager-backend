@@ -72,11 +72,13 @@ import com.rdkm.tdkservice.model.Module;
 import com.rdkm.tdkservice.model.Parameter;
 import com.rdkm.tdkservice.model.PrimitiveTest;
 import com.rdkm.tdkservice.model.PrimitiveTestParameter;
+import com.rdkm.tdkservice.model.Script;
 import com.rdkm.tdkservice.repository.FunctionRepository;
 import com.rdkm.tdkservice.repository.ModuleRepository;
 import com.rdkm.tdkservice.repository.ParameterRepository;
 import com.rdkm.tdkservice.repository.PrimitiveTestParameterRepository;
 import com.rdkm.tdkservice.repository.PrimitiveTestRepository;
+import com.rdkm.tdkservice.repository.ScriptRepository;
 import com.rdkm.tdkservice.repository.UserGroupRepository;
 import com.rdkm.tdkservice.service.IModuleService;
 import com.rdkm.tdkservice.service.utilservices.CommonService;
@@ -110,6 +112,9 @@ public class ModuleService implements IModuleService {
 
 	@Autowired
 	CommonService commonService;
+
+	@Autowired
+	private ScriptRepository scriptRepository;
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(ModuleService.class);
 
@@ -174,6 +179,11 @@ public class ModuleService implements IModuleService {
 					existingModule.setName(moduleDTO.getModuleName());
 				}
 			}
+		}
+
+		// Check if module execution time is being updated
+		if (moduleDTO.getExecutionTime() != null && moduleDTO.getExecutionTime() != existingModule.getExecutionTime()) {
+			validateModuleExecutionTimeUpdate(existingModule, moduleDTO.getExecutionTime());
 		}
 
 		// Check if isThunderEnabled is true
@@ -481,9 +491,8 @@ public class ModuleService implements IModuleService {
 	}
 
 	/**
-	 * Processes the primitive tests for a given module from the XML
-	 * It creates new primitive test if not existing, updated if
-	 * there is a change via comparison
+	 * Processes the primitive tests for a given module from the XML It creates new
+	 * primitive test if not existing, updated if there is a change via comparison
 	 * 
 	 * @param moduleElement
 	 * @param module
@@ -558,9 +567,8 @@ public class ModuleService implements IModuleService {
 	}
 
 	/**
-	 * Processes parameters for a given PrimitiveTest.
-	 * - Adds new parameters if not present.
-	 * - Updates existing ones only if there are changes.
+	 * Processes parameters for a given PrimitiveTest. - Adds new parameters if not
+	 * present. - Updates existing ones only if there are changes.
 	 */
 	private void processPrimitiveTestParameters(Element ptElement, PrimitiveTest primitiveTest) {
 		NodeList paramNodes = ptElement.getElementsByTagName(Constants.XML_PRIMITIVE_TEST_PARAMETER);
@@ -694,6 +702,8 @@ public class ModuleService implements IModuleService {
 		} catch (IllegalArgumentException | DataIntegrityViolationException e) {
 			LOGGER.error("Error processing module XML and saving", e);
 			throw new UserInputException("Error processing module element: " + e.getMessage());
+		} catch (UserInputException e) {
+			throw e; // Re-throw UserInputException as is
 		} catch (Exception e) {
 			LOGGER.error("Unexpected error processing module XML and saving", e);
 			throw new TDKServiceException("Unexpected error processing module element");
@@ -717,6 +727,7 @@ public class ModuleService implements IModuleService {
 		// ...move the update logic here, return true if any field was updated...
 		boolean isUpdated = false;
 		if (module.getExecutionTime() != executionTimeOut) {
+			validateModuleExecutionTimeUpdate(module, executionTimeOut);
 			module.setExecutionTime(executionTimeOut);
 			isUpdated = true;
 		}
@@ -842,8 +853,7 @@ public class ModuleService implements IModuleService {
 				try {
 					parameterRepository.save(parameter);
 				} catch (IllegalArgumentException | DataIntegrityViolationException e) {
-					LOGGER.error("Failed to save parameter: {}  for function: {}",
-							parameterName, function.getName());
+					LOGGER.error("Failed to save parameter: {}  for function: {}", parameterName, function.getName());
 					throw new UserInputException("Failed to save parameter: " + parameterName + " , check the XML");
 				} catch (Exception e) {
 					LOGGER.error("Unexpected error processing module XML and saving", e);
@@ -863,8 +873,8 @@ public class ModuleService implements IModuleService {
 	 * @param parameterDataType - data type of the parameter
 	 * @param rangeVal          - range value of the parameter
 	 */
-	private void validateParameterFields(String parameterName, Function function,
-			String paramID, String parameterDataType, String rangeVal) {
+	private void validateParameterFields(String parameterName, Function function, String paramID,
+			String parameterDataType, String rangeVal) {
 		if (parameterName == null || parameterName.isEmpty()) {
 			throw new UserInputException("Parameter name is required.");
 		}
@@ -914,8 +924,8 @@ public class ModuleService implements IModuleService {
 	private Element createModuleElement(Document doc, Module module) {
 		Element moduleElement = doc.createElement(Constants.XML_MODULE_TAG);
 		addComment(doc, moduleElement, "Module Id");
-		moduleElement.appendChild(
-				createElementWithTextContent(doc, Constants.XML_MODULE_ID, module.getId().toString()));
+		moduleElement
+				.appendChild(createElementWithTextContent(doc, Constants.XML_MODULE_ID, module.getId().toString()));
 
 		addComment(doc, moduleElement, Constants.MODULE_NAME);
 		moduleElement.appendChild(createElementWithTextContent(doc, Constants.XML_MODULE_NAME, module.getName()));
@@ -996,10 +1006,9 @@ public class ModuleService implements IModuleService {
 	}
 
 	/*
-	 * Appends the primitive tests (and their parameters) to the module element.
-	 * doc - the XML document
-	 * moduleElement - the module element
-	 * module - the module object
+	 * Appends the primitive tests (and their parameters) to the module element. doc
+	 * - the XML document moduleElement - the module element module - the module
+	 * object
 	 */
 	private void appendPrimitiveTestsToModuleElement(Document doc, Element moduleElement, Module module) {
 		addComment(doc, moduleElement, "Primitive tests associated with this module");
@@ -1014,9 +1023,8 @@ public class ModuleService implements IModuleService {
 				primitiveTestElement
 						.appendChild(createElementWithTextContent(doc, Constants.NAME, primitiveTest.getName()));
 				if (primitiveTest.getFunction() != null) {
-					primitiveTestElement.appendChild(
-							createElementWithTextContent(doc, Constants.XML_PARAMETER_FUN_NAME,
-									primitiveTest.getFunction().getName()));
+					primitiveTestElement.appendChild(createElementWithTextContent(doc, Constants.XML_PARAMETER_FUN_NAME,
+							primitiveTest.getFunction().getName()));
 				}
 
 				// Add parameters
@@ -1028,19 +1036,15 @@ public class ModuleService implements IModuleService {
 						Element paramElement = doc.createElement(Constants.XML_PRIMITIVE_TEST_PARAMETER);
 						paramElement
 								.appendChild(createElementWithTextContent(doc, Constants.ID, param.getId().toString()));
-						paramElement.appendChild(
-								createElementWithTextContent(doc, Constants.XML_PARAMETER_NAME,
-										param.getParameterName()));
-						paramElement.appendChild(
-								createElementWithTextContent(doc, Constants.XML_PARAMETER_TYPE,
-										param.getParameterType()));
-						paramElement.appendChild(
-								createElementWithTextContent(doc, Constants.XML_PARAMETER_RANGE,
-										param.getParameterRange()));
+						paramElement.appendChild(createElementWithTextContent(doc, Constants.XML_PARAMETER_NAME,
+								param.getParameterName()));
+						paramElement.appendChild(createElementWithTextContent(doc, Constants.XML_PARAMETER_TYPE,
+								param.getParameterType()));
+						paramElement.appendChild(createElementWithTextContent(doc, Constants.XML_PARAMETER_RANGE,
+								param.getParameterRange()));
 						if (param.getParameterValue() != null) {
-							paramElement.appendChild(
-									createElementWithTextContent(doc, Constants.XML_PARAMETER_VALUE,
-											param.getParameterValue()));
+							paramElement.appendChild(createElementWithTextContent(doc, Constants.XML_PARAMETER_VALUE,
+									param.getParameterValue()));
 						}
 						parametersElement.appendChild(paramElement);
 					}
@@ -1168,6 +1172,39 @@ public class ModuleService implements IModuleService {
 			return Collections.emptyList();
 		}
 		return modules.stream().map(Module::getName).collect(Collectors.toList());
+	}
+
+	/**
+	 * Validates module execution time update against its scripts' timeouts.
+	 *
+	 * @param module           the module to be updated
+	 * @param newExecutionTime the new execution time for the module
+	 * @throws UserInputException if any script has a timeout greater than the new
+	 *                            module execution time
+	 */
+	private void validateModuleExecutionTimeUpdate(Module module, Integer newExecutionTime) {
+		LOGGER.info("Validating module execution time update for module: {} with new timeout: {}", module.getName(),
+				newExecutionTime);
+
+		// Get all scripts under this module
+		List<Script> scripts = scriptRepository.findAllByModule(module);
+
+		if (scripts != null && !scripts.isEmpty()) {
+			// Find scripts with timeout greater than new module execution time
+			List<String> conflictingScripts = scripts.stream()
+					.filter(script -> script.getExecutionTimeOut() > newExecutionTime).map(Script::getName)
+					.collect(Collectors.toList());
+
+			if (!conflictingScripts.isEmpty()) {
+				String conflictingScriptNames = String.join(", ", conflictingScripts);
+				LOGGER.error("Cannot update module execution time. Scripts with higher timeout found: {}",
+						conflictingScriptNames);
+				throw new UserInputException(
+						"Cannot update module execution time. Scripts with higher timeout found. Please update these scripts timeout first or set a higher module execution time.");
+			}
+		}
+
+		LOGGER.info("Module execution time validation passed for module: {}", module.getName());
 	}
 
 }
