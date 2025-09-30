@@ -997,23 +997,23 @@ public class ExportExcelService implements IExportExcelService {
 				for (Map<String, Object> scriptData : moduleScripts) {
 					ExecutionResultStatus status = (ExecutionResultStatus) scriptData.get("status");
 					switch (status) {
-					case SUCCESS:
-						success++;
-						break;
-					case FAILURE:
-						failure++;
-						break;
-					case TIMEOUT:
-						timeout++;
-						break;
-					case NA:
-						notApplicable++;
-						break;
-					case SKIPPED:
-						skipped++;
-						break;
-					default:
-						LOGGER.warn("Unknown result status: {}", status);
+						case SUCCESS:
+							success++;
+							break;
+						case FAILURE:
+							failure++;
+							break;
+						case TIMEOUT:
+							timeout++;
+							break;
+						case NA:
+							notApplicable++;
+							break;
+						case SKIPPED:
+							skipped++;
+							break;
+						default:
+							LOGGER.warn("Unknown result status: {}", status);
 					}
 				}
 
@@ -1447,11 +1447,11 @@ public class ExportExcelService implements IExportExcelService {
 			totalSuccessCount += (int) device.get("totalSuccessCount");
 			totalNaCount += (int) device.get("totalNaCount");
 		}
-		String tdkversion = userService.getAppVersion();
+		String tdkVersion = userService.getAppVersion();
 		// Write consolidated data to the sheet
 		String[] headers = { "Device", "DeviceIP", "Execution Time (min)", "Image", "TDK Version" };
 		String[] values = { devices.toString(), deviceIPs.toString(), executionTimes.toString(), images.toString(),
-				tdkversion };
+				tdkVersion };
 
 		for (int i = 0; i < headers.length; i++) {
 			LOGGER.debug("Writing header '{}' and value '{}' to the sheet at row number: {}", headers[i], values[i],
@@ -1694,8 +1694,8 @@ public class ExportExcelService implements IExportExcelService {
 			// available
 			String overallPass = String.format("%.2f%%", overallSuccessPercentage);
 
-			String tdkversion = userService.getAppVersion();
-			String[] deviceValues = { deviceName, deviceIp, executionTime, imageName, overallPass, tdkversion };
+			String tdkVersion = userService.getAppVersion();
+			String[] deviceValues = { deviceName, deviceIp, executionTime, imageName, overallPass, tdkVersion };
 
 			// Create a bold style for headers
 			CellStyle boldStyle = sheet.getWorkbook().createCellStyle();
