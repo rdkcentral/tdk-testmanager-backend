@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -127,6 +128,9 @@ public class ExportExcelService implements IExportExcelService {
 
 	@Autowired
 	private AppConfig appConfig;
+
+	@Autowired
+	private UserService userService;
 
 	// Add looger
 	private static final Logger logger = LoggerFactory.getLogger(ExportExcelService.class);
@@ -381,7 +385,8 @@ public class ExportExcelService implements IExportExcelService {
 	 */
 	private void addDeviceDetails(Sheet sheet, Execution execution, int rowNum, double overallSuccessPercentage) {
 		try {
-			String[] deviceHeaders = { "Device", "DeviceIP", "Execution Time (min)", "Image", "Overall Pass %" };
+			String[] deviceHeaders = { "Device", "DeviceIP", "Execution Time (min)", "Image", "Overall Pass %",
+					"TDK Version" };
 			ExecutionDevice executionDevice = executionDeviceRepository.findByExecution(execution);
 			String deviceName = executionDevice != null && executionDevice.getDevice() != null
 					? executionDevice.getDevice()
@@ -391,12 +396,13 @@ public class ExportExcelService implements IExportExcelService {
 					: "N/A";
 			String executionTime = String.valueOf(execution.getExecutionTime());
 			String imageName = fileService.getImageName(String.valueOf(execution.getId()));
+			String tdkVersion = userService.getAppVersion();
 
 			if (imageName == null || imageName.isEmpty()) {
 				imageName = "Image not available"; // Assign a message if imageName is not found
 			}
 			String overallPass = String.format("%.2f%%", overallSuccessPercentage);
-			String[] deviceValues = { deviceName, deviceIp, executionTime, imageName, overallPass };
+			String[] deviceValues = { deviceName, deviceIp, executionTime, imageName, overallPass, tdkVersion };
 
 			// Create a bold style for headers
 			CellStyle boldStyle = sheet.getWorkbook().createCellStyle();
@@ -773,7 +779,10 @@ public class ExportExcelService implements IExportExcelService {
 					resultData.put("executed", "No");
 				}
 				resultData.put("status", result.getResult());
-				resultData.put("executedOn", result.getDateOfExecution() != null ? result.getDateOfExecution() : "N/A");
+				resultData.put("executedOn",
+						result.getDateOfExecution() != null
+								? formatExecutionDateToUTC(result.getDateOfExecution().toString())
+								: "N/A");
 				resultData.put("executionTime", result.getExecutionTime());
 
 				String logs = executionService.getExecutionLogs(result.getId().toString());
@@ -988,23 +997,23 @@ public class ExportExcelService implements IExportExcelService {
 				for (Map<String, Object> scriptData : moduleScripts) {
 					ExecutionResultStatus status = (ExecutionResultStatus) scriptData.get("status");
 					switch (status) {
-						case SUCCESS:
-							success++;
-							break;
-						case FAILURE:
-							failure++;
-							break;
-						case TIMEOUT:
-							timeout++;
-							break;
-						case NA:
-							notApplicable++;
-							break;
-						case SKIPPED:
-							skipped++;
-							break;
-						default:
-							LOGGER.warn("Unknown result status: {}", status);
+					case SUCCESS:
+						success++;
+						break;
+					case FAILURE:
+						failure++;
+						break;
+					case TIMEOUT:
+						timeout++;
+						break;
+					case NA:
+						notApplicable++;
+						break;
+					case SKIPPED:
+						skipped++;
+						break;
+					default:
+						LOGGER.warn("Unknown result status: {}", status);
 					}
 				}
 
@@ -1125,10 +1134,11 @@ public class ExportExcelService implements IExportExcelService {
 					}
 				}
 			}
+			ExecutionResult execResult = (ExecutionResult) result.get("executionResult");
 
 			// Fill logData cell with wrap style (multi-line support)
 			Cell logCell = row.createCell(5);
-			logCell.setCellValue(logData);
+			logCell.setCellValue(safeExcelValue(logData, execResult));
 			logCell.setCellStyle(wrapStyle);
 		}
 
@@ -1324,11 +1334,13 @@ public class ExportExcelService implements IExportExcelService {
 			for (ExecutionResult prioritizedResult : moduleEntry.getValue().values()) {
 				Map<String, Object> resultData = new HashMap<>();
 				resultData.put("moduleName", moduleName);
+				resultData.put("executionResult", prioritizedResult);
 				resultData.put("scriptName", prioritizedResult.getScript());
 				resultData.put("executed", prioritizedResult.getExecution().getResult());
 				resultData.put("status", prioritizedResult.getResult());
-				resultData.put("executedOn", Optional.ofNullable(prioritizedResult.getDateOfExecution())
-						.map(date -> date.toString()).orElse("N/A"));
+				resultData.put("executedOn",
+						Optional.ofNullable(formatExecutionDateToUTC(prioritizedResult.getDateOfExecution().toString()))
+								.map(date -> date.toString()).orElse("N/A"));
 				resultData.put("logData", executionService.getExecutionLogs(prioritizedResult.getId().toString()));
 
 				resultDataList.add(resultData);
@@ -1435,10 +1447,11 @@ public class ExportExcelService implements IExportExcelService {
 			totalSuccessCount += (int) device.get("totalSuccessCount");
 			totalNaCount += (int) device.get("totalNaCount");
 		}
-
+		String tdkversion = userService.getAppVersion();
 		// Write consolidated data to the sheet
-		String[] headers = { "Device", "DeviceIP", "Execution Time (min)", "Image" };
-		String[] values = { devices.toString(), deviceIPs.toString(), executionTimes.toString(), images.toString() };
+		String[] headers = { "Device", "DeviceIP", "Execution Time (min)", "Image", "TDK Version" };
+		String[] values = { devices.toString(), deviceIPs.toString(), executionTimes.toString(), images.toString(),
+				tdkversion };
 
 		for (int i = 0; i < headers.length; i++) {
 			LOGGER.debug("Writing header '{}' and value '{}' to the sheet at row number: {}", headers[i], values[i],
@@ -1466,6 +1479,7 @@ public class ExportExcelService implements IExportExcelService {
 		overallHeaderCell.setCellValue("Overall Pass %");
 		overallHeaderCell.setCellStyle(createBoldCellStyle(sheet.getWorkbook()));
 		overallRow.createCell(5).setCellValue(overallSuccessRate + "%");
+		sheet.createRow(rowNum++);
 
 		return rowNum;
 	}
@@ -1527,7 +1541,7 @@ public class ExportExcelService implements IExportExcelService {
 
 			// Add device details
 			addRawReportDeviceDetails(rawSheet, execution);
-			rowNum += 5; // Adjust rowNum after adding device details
+			rowNum += 7; // Adjust rowNum after adding device details
 			rowNum++; // Add an extra blank row
 
 			// Add "Summary" section
@@ -1659,7 +1673,8 @@ public class ExportExcelService implements IExportExcelService {
 		try {
 			LOGGER.info("Adding device details for execution: {}", execution.getId());
 
-			String[] deviceHeaders = { "Device", "DeviceIP", "Execution Time (min)", "Image", "Overall Pass %" };
+			String[] deviceHeaders = { "Device", "DeviceIP", "Execution Time (min)", "Image", "Overall Pass %",
+					"TDK Version" };
 			ExecutionDevice executionDevice = executionDeviceRepository.findByExecution(execution);
 			Map<String, ExecutionSummaryResponseDTO> moduleSummaryMap = executionService
 					.getModulewiseExecutionSummary(execution.getId(), null);
@@ -1679,7 +1694,8 @@ public class ExportExcelService implements IExportExcelService {
 			// available
 			String overallPass = String.format("%.2f%%", overallSuccessPercentage);
 
-			String[] deviceValues = { deviceName, deviceIp, executionTime, imageName, overallPass };
+			String tdkversion = userService.getAppVersion();
+			String[] deviceValues = { deviceName, deviceIp, executionTime, imageName, overallPass, tdkversion };
 
 			// Create a bold style for headers
 			CellStyle boldStyle = sheet.getWorkbook().createCellStyle();
@@ -1732,7 +1748,7 @@ public class ExportExcelService implements IExportExcelService {
 		Element device = doc.createElement("device");
 		device.setAttribute("name", executionDevice.getDevice());
 		device.setAttribute("deviceIp", executionDevice.getDeviceIp());
-		device.setAttribute("executiondate", execution.getCreatedDate().toString());
+		device.setAttribute("executiondate", formatExecutionDateToUTC(execution.getCreatedDate().toString()));
 		device.setAttribute("timetakentoexecute", String.valueOf(execution.getExecutionTime()));
 		device.setAttribute("status", execution.getExecutionStatus().toString());
 		rootElement.appendChild(device);
@@ -2028,6 +2044,12 @@ public class ExportExcelService implements IExportExcelService {
 		Cell deviceName = deviceNameRow.createCell(2);
 		deviceName.setCellValue(execDevice.getDevice());
 
+		Row tdkVersionRow = sheet.createRow(2);
+		Cell tdkVersionCell = tdkVersionRow.createCell(1);
+		tdkVersionCell.setCellValue("TDK Version");
+		Cell tdkVersion = tdkVersionRow.createCell(2);
+		tdkVersion.setCellValue(userService.getAppVersion());
+
 		// Add style to above two cells
 		CellStyle style = createArialStyle(workBook);
 		CellStyle boldStyle = createBoldStyle(workBook);
@@ -2035,6 +2057,8 @@ public class ExportExcelService implements IExportExcelService {
 		baseExecutionName.setCellStyle(boldStyle);
 		deviceNameCell.setCellStyle(boldStyle);
 		deviceName.setCellStyle(boldStyle);
+		tdkVersionCell.setCellStyle(boldStyle);
+		tdkVersion.setCellStyle(boldStyle);
 
 		createAndStyleArialHeaders(sheet, 5, headers, 0);
 
@@ -2334,8 +2358,11 @@ public class ExportExcelService implements IExportExcelService {
 					row.createCell(2).setCellValue(individualPreReqMatcher.group(4).trim()); // Status from
 																								// [Pre-requisite
 																								// Status]
-					row.createCell(3).setCellValue(createdDate.toString()); // Replace with actual execution time if
-																			// available
+					row.createCell(3).setCellValue(formatExecutionDateToUTC(createdDate.toString())); // Replace with
+																										// actual
+																										// execution
+																										// time if
+					// available
 					row.createCell(4).setCellValue(individualPreReqMatcher.group(0).trim()); // Log Data);
 
 					if (analysis != null) {
@@ -2360,7 +2387,7 @@ public class ExportExcelService implements IExportExcelService {
 					}
 				}
 			}
-
+			sheet.createRow(rowNum++);
 			// Create header row for test cases
 			String[] testCaseHeaders = { "Sl.No", "Test Case Name", "Status", "Executed On", "Log Data", "Jira ID",
 					"Issue Type", "Remarks" };
@@ -2368,7 +2395,7 @@ public class ExportExcelService implements IExportExcelService {
 			createAndStyleArialHeaders(sheet, rowNum++, testCaseHeaders, 0);
 			// Parse test cases and populate rows
 			Pattern testCasePattern = Pattern.compile(
-					"#==============================================================================#\\nTEST CASE NAME\\s*:\\s*(.*?)\\n.*?TEST CASE ID\\s*:\\s*(.*?)\\n.*?DESCRIPTION\\s*:\\s*(.*?)\\n.*?##--------- \\[TEST EXECUTION STATUS\\]\\s*:\\s*(.*?)\\s*----------##",
+					"TEST CASE NAME\\s*:\\s*(.*?)\\n.*?TEST CASE ID\\s*:\\s*(.*?)\\n.*?DESCRIPTION\\s*:\\s*(.*?)\\n.*?##--------- \\[TEST EXECUTION STATUS\\]\\s*:\\s*(.*?)\\s*----------##",
 					Pattern.DOTALL);
 			Matcher testCaseMatcher = testCasePattern.matcher(logData);
 			int testCaseNum = 1;
@@ -2377,8 +2404,7 @@ public class ExportExcelService implements IExportExcelService {
 				row.createCell(0).setCellValue(testCaseNum++);
 				row.createCell(1).setCellValue(testCaseMatcher.group(1).trim());
 				row.createCell(2).setCellValue(testCaseMatcher.group(4).trim());
-				row.createCell(3).setCellValue(createdDate.toString()); // Replace with actual execution time if
-																		// available
+				row.createCell(3).setCellValue(formatExecutionDateToUTC(createdDate.toString()));
 				row.createCell(4).setCellValue(testCaseMatcher.group(0).trim());
 				if (analysis != null) {
 					row.createCell(5).setCellValue(
@@ -2400,7 +2426,7 @@ public class ExportExcelService implements IExportExcelService {
 					row.getCell(i).setCellStyle(createArialStyle(workBook.getSheetAt(0).getWorkbook()));
 				}
 			}
-
+			sheet.createRow(rowNum++);
 			Pattern entirePostReqSectionPattern = Pattern
 					.compile("#---------------------------- Plugin Post-requisite ----------------------------#\\r?\\n"
 							+ "(.*?)" + "Plugin Post-requisite Status\\s*:\\s*\\w+\\r?\\n", Pattern.DOTALL);
@@ -2430,8 +2456,7 @@ public class ExportExcelService implements IExportExcelService {
 					row.createCell(0).setCellValue(postReqNum++);
 					row.createCell(1).setCellValue(individualPostReqMatcher.group(1).trim());
 					row.createCell(2).setCellValue(individualPostReqMatcher.group(2).trim());
-					row.createCell(3).setCellValue(createdDate.toString()); // Replace with actual execution time if
-																			// available
+					row.createCell(3).setCellValue(formatExecutionDateToUTC(createdDate.toString()));
 					row.createCell(4).setCellValue(individualPostReqMatcher.group(0).trim());
 					if (analysis != null) {
 						row.createCell(5)
@@ -2666,7 +2691,7 @@ public class ExportExcelService implements IExportExcelService {
 				}
 
 				row.createCell(3).setCellValue(failedScript.getResult().toString());
-				row.createCell(4).setCellValue(failedScript.getDateOfExecution().toString());
+				row.createCell(4).setCellValue(formatExecutionDateToUTC(failedScript.getDateOfExecution().toString()));
 				row.createCell(5).setCellValue(safeExcelValue(
 						executionService.getExecutionLogs(failedScript.getId().toString()), failedScript));
 				ExecutionResultAnalysis analysis = executionResultAnalysisRepository
@@ -2894,6 +2919,27 @@ public class ExportExcelService implements IExportExcelService {
 			return input.substring(0, 32000) + "\n...TRUNCATED: view full log at: " + logUrl;
 		}
 		return input;
+	}
+
+	/**
+	 * Formats an ISO-8601 date string to "yyyy-MM-dd UTC" format.
+	 *
+	 * @param isoDate the ISO-8601 date string to format
+	 * @return the formatted date string in "yyyy-MM-dd UTC" format
+	 * @throws IllegalArgumentException if the input date string is invalid
+	 */
+	private String formatExecutionDateToUTC(String isoDate) {
+		try {
+			// Parse the ISO-8601 date string to an Instant
+			Instant instant = Instant.parse(isoDate);
+			// Extract the date part in "yyyy-MM-dd" format
+			String datePart = instant.toString().substring(0, 10);
+			// Append "UTC" to the date
+			return datePart + " UTC";
+		} catch (DateTimeParseException e) {
+			LOGGER.error("Invalid date format: {}", isoDate, e);
+			throw new IllegalArgumentException("Invalid date format: " + isoDate, e);
+		}
 	}
 
 }

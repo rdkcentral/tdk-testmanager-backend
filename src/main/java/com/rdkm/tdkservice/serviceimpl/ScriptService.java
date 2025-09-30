@@ -211,6 +211,11 @@ public class ScriptService implements IScriptService {
 		}
 		script.setModule(module);
 
+		if (module.getExecutionTime() < script.getExecutionTimeOut()) {
+			LOGGER.error("Script execution time out cannot be greater than module execution time");
+			throw new UserInputException("Script execution time out cannot be greater than module execution time");
+		}
+
 		// Set the category based on the module
 		Category category = this.getCategoryBasedOnModule(module);
 		script.setCategory(category);
@@ -331,6 +336,11 @@ public class ScriptService implements IScriptService {
 			throw new TDKServiceException("Module not found for the primitive test: " + primitiveTest.getName());
 		}
 		script.setModule(module);
+
+		if (module.getExecutionTime() < scriptUpdateDTO.getExecutionTimeOut()) {
+			LOGGER.error("Script execution time out cannot be greater than module execution time");
+			throw new UserInputException("Script execution time out cannot be greater than module execution time");
+		}
 
 		// Set the category based on the module
 		Category category = this.getCategoryBasedOnModule(module);
