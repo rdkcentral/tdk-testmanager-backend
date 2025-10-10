@@ -607,7 +607,7 @@ public class Constants {
 	public static final String CI_IMAGE_BOXTYPE_CONFIG_FILE = "ci_image_boxtype.config";
 
 	// TM URL
-	public static final String TM_URL_EXEC_KEY_CONFIG_FILE = "tmURL_exec";
+	public static final String TM_URL_EXEC_KEY_CONFIG_FILE = "tmURL";
 
 	// VTS package
 	public static final String VTS = "VTS";

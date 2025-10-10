@@ -564,6 +564,9 @@ public class TestSuiteService implements ITestSuiteService {
 		// Validate the uploaded file
 		validateFile(testSuiteXMLFile);
 		try {
+
+			String testSuiteName = testSuiteXMLFile.getOriginalFilename().replace(Constants.XML_EXTENSION,
+					Constants.EMPTY_STRING);
 			InputStream xmlInputStream = testSuiteXMLFile.getInputStream();
 			// Parse XML
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -577,8 +580,14 @@ public class TestSuiteService implements ITestSuiteService {
 			NodeList categoryList = document.getElementsByTagName("category");
 			String category = categoryList.item(0).getTextContent();
 
+			String desc;
 			NodeList description = document.getElementsByTagName("description");
-			String desc = description.item(0).getTextContent();
+			if (null != description && description.getLength() > 0) {
+				desc = description.item(0).getTextContent();
+			} else {
+				desc = "Test suite for " + testSuiteName;
+
+			}
 
 			List<ScriptListDTO> scriptListDTO = new ArrayList<>();
 
@@ -594,9 +603,6 @@ public class TestSuiteService implements ITestSuiteService {
 					scriptListDTO.add(scriptDTO);
 				}
 			}
-
-			String testSuiteName = testSuiteXMLFile.getOriginalFilename().replace(Constants.XML_EXTENSION,
-					Constants.EMPTY_STRING);
 
 			TestSuite testSuite = testSuiteRepository.findByName(testSuiteName);
 			if (testSuite == null) {
