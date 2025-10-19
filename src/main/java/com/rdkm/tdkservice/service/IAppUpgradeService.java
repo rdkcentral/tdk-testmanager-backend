@@ -26,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.rdkm.tdkservice.dto.AppUpgradeResponseDTO;
 import com.rdkm.tdkservice.dto.DeploymentLogsDTO;
+import com.rdkm.tdkservice.dto.EntityListResponseDTO;
 import com.rdkm.tdkservice.dto.WarUploadResponseDTO;
 
 /**
@@ -56,6 +57,36 @@ public interface IAppUpgradeService {
 	 * @throws IOException if an I/O error occurs during file writing
 	 */
 	void writeAppUpgradeSqlToFile(Instant since, String filePath) throws IOException;
+
+	/**
+	 * Generates a JSON list of entity names that were created after the specified
+	 * date.
+	 * This method retrieves all entities (DeviceType, OEM, SOC, Module, Function,
+	 * Parameter, PrimitiveTest, Script, TestSuite) created after the given
+	 * timestamp
+	 * and returns them in DTO format organized by entity type and category.
+	 *
+	 * @param since the Instant timestamp; only entities created after this time are
+	 *              included
+	 * @return EntityListResponseDTO containing categorized lists of entity names
+	 */
+	EntityListResponseDTO generateEntityListJsonByCreatedDate(Instant since);
+
+	/**
+	 * Generates and writes entity list JSON to a file for entities created after
+	 * the specified date.
+	 * This method creates a JSON file containing all entities (DeviceType, OEM,
+	 * SOC, Module,
+	 * Function, Parameter, PrimitiveTest, Script, TestSuite) that were created
+	 * after the
+	 * given timestamp, organized by entity type and category.
+	 *
+	 * @param since    the Instant timestamp; only entities created after this time
+	 *                 are included
+	 * @param filePath the path to the output JSON file
+	 * @throws IOException if an I/O error occurs during file writing
+	 */
+	void writeEntityListJsonToFile(Instant since, String filePath) throws IOException;
 
 	/**
 	 * Uploads a WAR file for application upgrade
