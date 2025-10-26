@@ -632,4 +632,7 @@ public class Constants {
 	// app upgrage shell script file
 	public static final String APP_UPGRADE_WAR_FILE = "app_upgrade_deploy_new_war.sh";
 
+	// Get Image name python file
+	public static final String THUNDER_DISABLED_IMAGE_NAME_SCRIPT = "getimagename_cmndline.py";
+
 }
