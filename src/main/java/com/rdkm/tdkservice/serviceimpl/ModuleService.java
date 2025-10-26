@@ -180,11 +180,11 @@ public class ModuleService implements IModuleService {
 				}
 			}
 		}
-
-		// Check if module execution time is being updated
-		if (moduleDTO.getExecutionTime() != null && moduleDTO.getExecutionTime() != existingModule.getExecutionTime()) {
-			validateModuleExecutionTimeUpdate(existingModule, moduleDTO.getExecutionTime());
-		}
+//	TODO: Need to implement later
+//		// Check if module execution time is being updated
+//		if (moduleDTO.getExecutionTime() != null && moduleDTO.getExecutionTime() != existingModule.getExecutionTime()) {
+//			validateModuleExecutionTimeUpdate(existingModule, moduleDTO.getExecutionTime());
+//		}
 
 		// Check if isThunderEnabled is true
 		if (moduleDTO.isModuleThunderEnabled()) {
@@ -727,7 +727,8 @@ public class ModuleService implements IModuleService {
 		// ...move the update logic here, return true if any field was updated...
 		boolean isUpdated = false;
 		if (module.getExecutionTime() != executionTimeOut) {
-			validateModuleExecutionTimeUpdate(module, executionTimeOut);
+			// TODO: Need to implement later
+//			validateModuleExecutionTimeUpdate(module, executionTimeOut);
 			module.setExecutionTime(executionTimeOut);
 			isUpdated = true;
 		}
@@ -1182,29 +1183,30 @@ public class ModuleService implements IModuleService {
 	 * @throws UserInputException if any script has a timeout greater than the new
 	 *                            module execution time
 	 */
-	private void validateModuleExecutionTimeUpdate(Module module, Integer newExecutionTime) {
-		LOGGER.info("Validating module execution time update for module: {} with new timeout: {}", module.getName(),
-				newExecutionTime);
-
-		// Get all scripts under this module
-		List<Script> scripts = scriptRepository.findAllByModule(module);
-
-		if (scripts != null && !scripts.isEmpty()) {
-			// Find scripts with timeout greater than new module execution time
-			List<String> conflictingScripts = scripts.stream()
-					.filter(script -> script.getExecutionTimeOut() > newExecutionTime).map(Script::getName)
-					.collect(Collectors.toList());
-
-			if (!conflictingScripts.isEmpty()) {
-				String conflictingScriptNames = String.join(", ", conflictingScripts);
-				LOGGER.error("Cannot update module execution time. Scripts with higher timeout found: {}",
-						conflictingScriptNames);
-				throw new UserInputException(
-						"Cannot update module execution time. Scripts with higher timeout found. Please update these scripts timeout first or set a higher module execution time.");
-			}
-		}
-
-		LOGGER.info("Module execution time validation passed for module: {}", module.getName());
-	}
+	// TODO: Revisit this method when feature needs to be implemented
+//	private void validateModuleExecutionTimeUpdate(Module module, Integer newExecutionTime) {
+//		LOGGER.info("Validating module execution time update for module: {} with new timeout: {}", module.getName(),
+//				newExecutionTime);
+//
+//		// Get all scripts under this module
+//		List<Script> scripts = scriptRepository.findAllByModule(module);
+//
+//		if (scripts != null && !scripts.isEmpty()) {
+//			// Find scripts with timeout greater than new module execution time
+//			List<String> conflictingScripts = scripts.stream()
+//					.filter(script -> script.getExecutionTimeOut() > newExecutionTime).map(Script::getName)
+//					.collect(Collectors.toList());
+//
+//			if (!conflictingScripts.isEmpty()) {
+//				String conflictingScriptNames = String.join(", ", conflictingScripts);
+//				LOGGER.error("Cannot update module execution time. Scripts with higher timeout found: {}",
+//						conflictingScriptNames);
+//				throw new UserInputException(
+//						"Cannot update module execution time. Scripts with higher timeout found. Please update these scripts timeout first or set a higher module execution time.");
+//			}
+//		}
+//
+//		LOGGER.info("Module execution time validation passed for module: {}", module.getName());
+//	}
 
 }
