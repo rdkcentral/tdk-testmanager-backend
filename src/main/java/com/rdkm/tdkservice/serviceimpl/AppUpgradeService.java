@@ -33,12 +33,19 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+
 import java.util.stream.Stream;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +55,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.rdkm.tdkservice.config.AppConfig;
 import com.rdkm.tdkservice.dto.AppUpgradeResponseDTO;
+import com.rdkm.tdkservice.dto.CategoryChangeDTO;
 import com.rdkm.tdkservice.dto.DeploymentLogsDTO;
+import com.rdkm.tdkservice.dto.EntityDataDTO;
+import com.rdkm.tdkservice.dto.EntityListMetadataDTO;
+import com.rdkm.tdkservice.dto.EntityListResponseDTO;
 import com.rdkm.tdkservice.dto.WarUploadResponseDTO;
 import com.rdkm.tdkservice.exception.TDKServiceException;
 import com.rdkm.tdkservice.exception.UserInputException;
@@ -169,6 +180,424 @@ public class AppUpgradeService implements IAppUpgradeService {
 		} catch (IOException e) {
 			LOGGER.error("Error writing app upgrade SQL to file", e);
 			throw new TDKServiceException("Failed to write app upgrade SQL: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Generates a DTO containing entity names that were created or updated after
+	 * the
+	 * specified date.
+	 * This method retrieves all entities (DeviceType, OEM, SOC, Module, Function,
+	 * Parameter, PrimitiveTest, Script, TestSuite) created or updated after the
+	 * given timestamp
+	 * and returns them in DTO format organized by category with separate sections
+	 * for new and updated data.
+	 *
+	 * @param since the Instant timestamp; only entities created or updated after
+	 *              this time are included
+	 * @return EntityListResponseDTO containing categorized lists of entity names
+	 *         grouped by
+	 *         category with new/updated data
+	 * @throws TDKServiceException if there's an error generating the DTO
+	 */
+	public EntityListResponseDTO generateEntityListJsonByCreatedDate(Instant since) {
+		LOGGER.info("Generating entity list DTO for entities created or updated after: {}", since);
+
+		try {
+			// Create metadata
+			EntityListMetadataDTO metadata = new EntityListMetadataDTO();
+			metadata.setGeneratedAt(Instant.now().toString());
+			metadata.setSinceDate(since.toString());
+			metadata.setDescription("List of entities created or updated after specified date, organized by category");
+
+			// Get all entities created or updated since the specified date
+			Map<String, Map<String, Map<String, List<String>>>> changesByCategory = new HashMap<>();
+
+			// Process all entity types
+			processEntityChanges(changesByCategory, since);
+
+			// Convert to DTO structure
+			List<CategoryChangeDTO> changes = new ArrayList<>();
+			for (Map.Entry<String, Map<String, Map<String, List<String>>>> categoryEntry : changesByCategory
+					.entrySet()) {
+				String category = categoryEntry.getKey();
+				Map<String, Map<String, List<String>>> entityData = categoryEntry.getValue();
+
+				// Create EntityDataDTO for new data
+				EntityDataDTO newData = createEntityDataDTO(entityData, "new");
+
+				// Create EntityDataDTO for updated data
+				EntityDataDTO updatedData = createEntityDataDTO(entityData, "updated");
+
+				// Create CategoryChangeDTO
+				CategoryChangeDTO categoryChange = new CategoryChangeDTO();
+				categoryChange.setCategory(category);
+				categoryChange.setNewData(newData);
+				categoryChange.setUpdatedData(updatedData);
+
+				changes.add(categoryChange);
+			}
+
+			// Create the main response DTO
+			EntityListResponseDTO response = new EntityListResponseDTO();
+			response.setMetadata(metadata);
+			response.setChanges(changes);
+
+			LOGGER.info("Successfully generated entity list DTO for entities created or updated after: {}", since);
+			return response;
+
+		} catch (Exception e) {
+			LOGGER.error("Unexpected error generating entity list DTO", e);
+			throw new TDKServiceException("Failed to generate entity list: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Creates an EntityDataDTO from entity data for a specific change type
+	 * 
+	 * @param entityData the map containing entity type to change type to names
+	 * @param changeType the change type ("new" or "updated")
+	 * @return EntityDataDTO with populated data or "No changes" for empty lists
+	 */
+	private EntityDataDTO createEntityDataDTO(Map<String, Map<String, List<String>>> entityData, String changeType) {
+		EntityDataDTO dto = new EntityDataDTO();
+
+		// Helper method to get list or default message
+		java.util.function.Function<String, List<String>> getEntityList = (entityType) -> {
+			Map<String, List<String>> changeTypes = entityData.get(entityType);
+			if (changeTypes != null && changeTypes.containsKey(changeType)) {
+				List<String> entityList = changeTypes.get(changeType);
+				return entityList.isEmpty() ? List.of("No changes") : entityList;
+			}
+			return List.of("No changes");
+		};
+
+		dto.setDeviceType(getEntityList.apply("deviceType"));
+		dto.setOem(getEntityList.apply("oem"));
+		dto.setSoc(getEntityList.apply("soc"));
+		dto.setModule(getEntityList.apply("module"));
+		dto.setFunction(getEntityList.apply("function"));
+		dto.setParameter(getEntityList.apply("parameter"));
+		dto.setPrimitiveTest(getEntityList.apply("primitiveTest"));
+		dto.setScript(getEntityList.apply("script"));
+		dto.setTestSuite(getEntityList.apply("testSuite"));
+
+		return dto;
+	}
+
+	/**
+	 * Normalizes category names to standard RDKV/RDKB format
+	 * 
+	 * @param rawCategory the raw category string
+	 * @return normalized category (RDKV, RDKB, or UNCATEGORIZED)
+	 */
+	private String normalizeCategory(String rawCategory) {
+		if (rawCategory == null || rawCategory.trim().isEmpty()) {
+			return "UNCATEGORIZED";
+		}
+
+		String category = rawCategory.toUpperCase().trim();
+
+		// Normalize RDKV variants
+		if (category.equals("RDKV") || category.equals("RDKV_RDKSERVICE") || category.startsWith("RDKV")) {
+			return "RDKV";
+		}
+
+		// Normalize RDKB variants
+		if (category.equals("RDKB") || category.startsWith("RDKB")) {
+			return "RDKB";
+		}
+
+		// All other categories are considered uncategorized
+		return "UNCATEGORIZED";
+	}
+
+	/**
+	 * Processes entity changes and organizes them by category, entity type, and
+	 * change type (new/updated)
+	 */
+	private void processEntityChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		// Process DeviceType entities
+		processDeviceTypeChanges(changesByCategory, since);
+
+		// Process OEM entities
+		processOemChanges(changesByCategory, since);
+
+		// Process SOC entities
+		processSocChanges(changesByCategory, since);
+
+		// Process Module entities
+		processModuleChanges(changesByCategory, since);
+
+		// Process Function entities
+		processFunctionChanges(changesByCategory, since);
+
+		// Process Parameter entities
+		processParameterChanges(changesByCategory, since);
+
+		// Process PrimitiveTest entities
+		processPrimitiveTestChanges(changesByCategory, since);
+
+		// Process Script entities
+		processScriptChanges(changesByCategory, since);
+
+		// Process TestSuite entities
+		processTestSuiteChanges(changesByCategory, since);
+	}
+
+	/**
+	 * Processes DeviceType entity changes and organizes them by category and change
+	 * type (new/updated)
+	 */
+	private void processDeviceTypeChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<DeviceType> deviceTypes = deviceTypeRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+
+		for (DeviceType dt : deviceTypes) {
+			if (dt.getName() != null) {
+				String rawCategory = dt.getCategory() != null ? dt.getCategory().toString() : null;
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = dt.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "deviceType", changeType, dt.getName());
+			}
+		}
+	}
+
+	/**
+	 * Processes Oem entity changes and organizes them by category and change type
+	 * (new/updated)
+	 */
+	private void processOemChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<Oem> oems = oemRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+
+		for (Oem oem : oems) {
+			if (oem.getName() != null) {
+				String rawCategory = oem.getCategory() != null ? oem.getCategory().toString() : null;
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = oem.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "oem", changeType, oem.getName());
+			}
+		}
+	}
+
+	/**
+	 * Processes Soc entity changes and organizes them by category and change type
+	 * (new/updated)
+	 */
+	private void processSocChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<Soc> socs = socRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+
+		for (Soc soc : socs) {
+			if (soc.getName() != null) {
+				String rawCategory = soc.getCategory() != null ? soc.getCategory().toString() : null;
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = soc.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "soc", changeType, soc.getName());
+			}
+		}
+	}
+
+	/**
+	 * Processes Module entity changes and organizes them by category and change
+	 * type (new/updated)
+	 */
+	private void processModuleChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<Module> modules = moduleRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+
+		for (Module module : modules) {
+			if (module.getName() != null) {
+				String rawCategory = module.getCategory() != null ? module.getCategory().name() : null;
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = module.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "module", changeType, module.getName());
+			}
+		}
+	}
+
+	/**
+	 * Processes Function entity changes and organizes them by category and change
+	 * type (new/updated)
+	 */
+	private void processFunctionChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<Function> functions = functionRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+
+		for (Function function : functions) {
+			if (function.getName() != null) {
+				String rawCategory = function.getCategory() != null ? function.getCategory().name() : null;
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = function.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "function", changeType, function.getName());
+			}
+		}
+	}
+
+	/**
+	 * Processes Parameter entity changes and organizes them by category and change
+	 * type (new/updated)
+	 */
+	private void processParameterChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<Parameter> parameters = parameterRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+
+		for (Parameter parameter : parameters) {
+			if (parameter.getName() != null) {
+				// Use function's category if available, otherwise use parameter data type
+				String rawCategory = null;
+				if (parameter.getFunction() != null && parameter.getFunction().getCategory() != null) {
+					rawCategory = parameter.getFunction().getCategory().name();
+				} else if (parameter.getParameterDataType() != null) {
+					rawCategory = parameter.getParameterDataType().name();
+				}
+
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = parameter.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "parameter", changeType, parameter.getName());
+			}
+		}
+	}
+
+	/**
+	 * Processes PrimitiveTest entity changes and organizes them by category and
+	 * change
+	 * type (new/updated)
+	 */
+	private void processPrimitiveTestChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<PrimitiveTest> primitiveTests = primitiveTestRepository.findByCreatedDateAfterOrUpdatedAtAfter(since,
+				since);
+
+		for (PrimitiveTest pt : primitiveTests) {
+			if (pt.getName() != null) {
+				String rawCategory = pt.getModule() != null && pt.getModule().getCategory() != null
+						? pt.getModule().getCategory().name()
+						: null;
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = pt.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "primitiveTest", changeType, pt.getName());
+			}
+		}
+	}
+
+	/**
+	 * Processes Script entity changes and organizes them by category and change
+	 * type
+	 * (new/updated)
+	 */
+	private void processScriptChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<Script> scripts = scriptRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+
+		for (Script script : scripts) {
+			if (script.getName() != null) {
+				String rawCategory = script.getCategory() != null ? script.getCategory().name() : null;
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = script.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "script", changeType, script.getName());
+			}
+		}
+	}
+
+	/**
+	 * Processes TestSuite entity changes and organizes them by category and change
+	 * type (new/updated)
+	 */
+	private void processTestSuiteChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			Instant since) {
+		List<TestSuite> testSuites = testSuiteRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+
+		// Filter out TestSuites whose name matches any existing Module name
+		List<String> moduleNames = moduleRepository.findAll().stream()
+				.map(Module::getName)
+				.filter(java.util.Objects::nonNull)
+				.toList();
+
+		for (TestSuite ts : testSuites) {
+			if (ts.getName() != null && !moduleNames.contains(ts.getName())) {
+				String rawCategory = ts.getCategory() != null ? ts.getCategory().name() : null;
+				String category = normalizeCategory(rawCategory);
+				boolean isNew = ts.getCreatedDate().isAfter(since);
+				String changeType = isNew ? "new" : "updated";
+
+				addToChanges(changesByCategory, category, "testSuite", changeType, ts.getName());
+			}
+		}
+	}
+
+	/**
+	 * Adds an entity name to the changes map under the specified category, entity
+	 * type, and change type.
+	 * 
+	 * @param changesByCategory
+	 * @param category
+	 * @param entityType
+	 * @param changeType
+	 * @param entityName
+	 */
+	private void addToChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
+			String category, String entityType, String changeType, String entityName) {
+		changesByCategory
+				.computeIfAbsent(category, k -> new HashMap<>())
+				.computeIfAbsent(entityType, k -> new HashMap<>())
+				.computeIfAbsent(changeType, k -> new ArrayList<>())
+				.add(entityName);
+	}
+
+	/**
+	 * Generates and writes entity list JSON to a file for entities created after
+	 * the specified date.
+	 * This method creates a JSON file containing all entities (DeviceType, OEM,
+	 * SOC, Module,
+	 * Function, Parameter, PrimitiveTest, Script, TestSuite) that were created
+	 * after the
+	 * given timestamp, organized by entity type and category.
+	 *
+	 * @param since    the Instant timestamp; only entities created after this time
+	 *                 are included
+	 * @param filePath the path to the output JSON file
+	 * @throws IOException if an I/O error occurs during file writing
+	 */
+	public void writeEntityListJsonToFile(Instant since, String filePath) throws IOException {
+		LOGGER.info("Writing entity list JSON to file: {}", filePath);
+
+		try {
+			EntityListResponseDTO responseDTO = generateEntityListJsonByCreatedDate(since);
+
+			ObjectMapper objectMapper = new ObjectMapper();
+			String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(responseDTO);
+
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+				writer.write(json);
+			}
+
+			LOGGER.info("Successfully wrote entity list JSON to file: {}", filePath);
+
+		} catch (JsonProcessingException e) {
+			LOGGER.error("Error serializing entity list DTO to JSON", e);
+			throw new TDKServiceException("Failed to serialize entity list DTO: " + e.getMessage());
+		} catch (IOException e) {
+			LOGGER.error("Error writing entity list JSON to file", e);
+			throw new TDKServiceException("Failed to write entity list JSON: " + e.getMessage());
 		}
 	}
 

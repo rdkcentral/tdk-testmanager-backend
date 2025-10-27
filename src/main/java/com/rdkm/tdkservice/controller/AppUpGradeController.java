@@ -44,11 +44,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.rdkm.tdkservice.dto.AppUpgradeResponseDTO;
 import com.rdkm.tdkservice.dto.DeploymentLogsDTO;
+import com.rdkm.tdkservice.dto.EntityListResponseDTO;
 import com.rdkm.tdkservice.dto.WarUploadResponseDTO;
 import com.rdkm.tdkservice.exception.TDKServiceException;
 import com.rdkm.tdkservice.response.DataResponse;
 import com.rdkm.tdkservice.service.IAppUpgradeService;
-import com.rdkm.tdkservice.serviceimpl.AppUpgradeService;
+
 import com.rdkm.tdkservice.util.ResponseUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -98,6 +99,10 @@ public class AppUpGradeController {
 	 * @param since - The time stamp from which the changes needs to be populated
 	 */
 	@GetMapping("/exportChangeBasedOnTime")
+	@Operation(summary = "Export change SQL based on timestamp")
+	@ApiResponses(value = { @ApiResponse(responseCode = "200", description = "Export Successfully"),
+			@ApiResponse(responseCode = "400", description = "Invalid Time format"),
+			@ApiResponse(responseCode = "500", description = "Internal Server Error") })
 	public ResponseEntity<byte[]> exportChangeSql(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since) {
 		try {
@@ -112,6 +117,69 @@ public class AppUpGradeController {
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body(("Error exporting SQL: " + e.getMessage()).getBytes());
+		}
+	}
+
+	/**
+	 * Exports entity list in JSON format based on the provided timestamp. This
+	 * endpoint
+	 * generates a JSON file containing all entities (DeviceType, OEM, SOC, Module,
+	 * Function,
+	 * Parameter, PrimitiveTest, Script, TestSuite) that were created after the
+	 * given timestamp,
+	 * organized by entity type and category. This is useful for tracking new
+	 * entities
+	 * created for distribution across multiple instances via Liquibase.
+	 *
+	 * @param since - The timestamp from which the entities need to be populated
+	 */
+	@GetMapping("/exportEntityListJson")
+	@Operation(summary = "Export entity list JSON based on timestamp")
+	@ApiResponses(value = { @ApiResponse(responseCode = "200", description = "Export Successfully"),
+			@ApiResponse(responseCode = "400", description = "Invalid Time format"),
+			@ApiResponse(responseCode = "500", description = "Internal Server Error") })
+	public ResponseEntity<byte[]> exportEntityListJson(
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since) {
+		try {
+			String filePath = "entity_list_" + since.toString().replace(":", "-") + ".json";
+			appUpgradeService.writeEntityListJsonToFile(since, filePath);
+			Path path = Paths.get(filePath);
+			byte[] fileBytes = Files.readAllBytes(path);
+			HttpHeaders headers = new HttpHeaders();
+			headers.setContentType(MediaType.APPLICATION_JSON);
+			headers.setContentDispositionFormData("attachment", filePath);
+			return new ResponseEntity<>(fileBytes, headers, HttpStatus.OK);
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(("Error exporting entity list JSON: " + e.getMessage()).getBytes());
+		}
+	}
+
+	/**
+	 * Returns entity list in JSON format based on the provided timestamp. This
+	 * endpoint
+	 * generates a JSON response containing all entities (DeviceType, OEM, SOC,
+	 * Module, Function,
+	 * Parameter, PrimitiveTest, Script, TestSuite) that were created after the
+	 * given timestamp,
+	 * organized by entity type and category.
+	 *
+	 * @param since - The timestamp from which the entities need to be populated
+	 */
+	@GetMapping("/getListOfAllChangesSince")
+	@Operation(summary = "Get entity list JSON based on timestamp")
+	@ApiResponses(value = { @ApiResponse(responseCode = "200", description = "Retrieved Successfully"),
+			@ApiResponse(responseCode = "400", description = "Invalid Time format"),
+			@ApiResponse(responseCode = "500", description = "Internal Server Error") })
+	public ResponseEntity<DataResponse> getEntityListJson(
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since) {
+		try {
+			EntityListResponseDTO result = appUpgradeService.generateEntityListJsonByCreatedDate(since);
+			return ResponseUtils.getSuccessDataResponse("Successfully retrieved the new changes", result);
+		} catch (Exception e) {
+			// Create an error response DTO
+			throw new TDKServiceException("Error fetching data list changes since the UTC time: " + since.toString());
+			// Return appropriate error response
 		}
 	}
 
