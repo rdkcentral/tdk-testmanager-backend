@@ -40,10 +40,10 @@ public class LiquibaseConfig {
     @Value("${spring.liquibase.change-log:classpath:db/changelogs/changelog-master.xml}")
     private String changeLog;
 
-    @Value("${spring.liquibase.database-change-log-table:changswithLiquibase}")
+    @Value("${spring.liquibase.database-change-log-table:databasechangelog}")
     private String databaseChangeLogTable;
 
-    @Value("${spring.liquibase.database-change-log-lock-table:changswithLiquibaseLock}")
+    @Value("${spring.liquibase.database-change-log-lock-table:databasechangeloglock}")
     private String databaseChangeLogLockTable;
 
     /**
