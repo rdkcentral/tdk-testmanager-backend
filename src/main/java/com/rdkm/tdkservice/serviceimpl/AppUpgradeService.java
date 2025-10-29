@@ -185,19 +185,15 @@ public class AppUpgradeService implements IAppUpgradeService {
 
 	/**
 	 * Generates a DTO containing entity names that were created or updated after
-	 * the
-	 * specified date.
-	 * This method retrieves all entities (DeviceType, OEM, SOC, Module, Function,
-	 * Parameter, PrimitiveTest, Script, TestSuite) created or updated after the
-	 * given timestamp
-	 * and returns them in DTO format organized by category with separate sections
-	 * for new and updated data.
+	 * the specified date. This method retrieves all entities (DeviceType, OEM, SOC,
+	 * Module, Function, Parameter, PrimitiveTest, Script, TestSuite) created or
+	 * updated after the given timestamp and returns them in DTO format organized by
+	 * category with separate sections for new and updated data.
 	 *
 	 * @param since the Instant timestamp; only entities created or updated after
 	 *              this time are included
 	 * @return EntityListResponseDTO containing categorized lists of entity names
-	 *         grouped by
-	 *         category with new/updated data
+	 *         grouped by category with new/updated data
 	 * @throws TDKServiceException if there's an error generating the DTO
 	 */
 	public EntityListResponseDTO generateEntityListJsonByCreatedDate(Instant since) {
@@ -475,8 +471,7 @@ public class AppUpgradeService implements IAppUpgradeService {
 
 	/**
 	 * Processes PrimitiveTest entity changes and organizes them by category and
-	 * change
-	 * type (new/updated)
+	 * change type (new/updated)
 	 */
 	private void processPrimitiveTestChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
 			Instant since) {
@@ -499,8 +494,7 @@ public class AppUpgradeService implements IAppUpgradeService {
 
 	/**
 	 * Processes Script entity changes and organizes them by category and change
-	 * type
-	 * (new/updated)
+	 * type (new/updated)
 	 */
 	private void processScriptChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
 			Instant since) {
@@ -527,10 +521,8 @@ public class AppUpgradeService implements IAppUpgradeService {
 		List<TestSuite> testSuites = testSuiteRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
 
 		// Filter out TestSuites whose name matches any existing Module name
-		List<String> moduleNames = moduleRepository.findAll().stream()
-				.map(Module::getName)
-				.filter(java.util.Objects::nonNull)
-				.toList();
+		List<String> moduleNames = moduleRepository.findAll().stream().map(Module::getName)
+				.filter(java.util.Objects::nonNull).toList();
 
 		for (TestSuite ts : testSuites) {
 			if (ts.getName() != null && !moduleNames.contains(ts.getName())) {
@@ -554,23 +546,19 @@ public class AppUpgradeService implements IAppUpgradeService {
 	 * @param changeType
 	 * @param entityName
 	 */
-	private void addToChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
-			String category, String entityType, String changeType, String entityName) {
-		changesByCategory
-				.computeIfAbsent(category, k -> new HashMap<>())
-				.computeIfAbsent(entityType, k -> new HashMap<>())
-				.computeIfAbsent(changeType, k -> new ArrayList<>())
+	private void addToChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory, String category,
+			String entityType, String changeType, String entityName) {
+		changesByCategory.computeIfAbsent(category, k -> new HashMap<>())
+				.computeIfAbsent(entityType, k -> new HashMap<>()).computeIfAbsent(changeType, k -> new ArrayList<>())
 				.add(entityName);
 	}
 
 	/**
 	 * Generates and writes entity list JSON to a file for entities created after
-	 * the specified date.
-	 * This method creates a JSON file containing all entities (DeviceType, OEM,
-	 * SOC, Module,
-	 * Function, Parameter, PrimitiveTest, Script, TestSuite) that were created
-	 * after the
-	 * given timestamp, organized by entity type and category.
+	 * the specified date. This method creates a JSON file containing all entities
+	 * (DeviceType, OEM, SOC, Module, Function, Parameter, PrimitiveTest, Script,
+	 * TestSuite) that were created after the given timestamp, organized by entity
+	 * type and category.
 	 *
 	 * @param since    the Instant timestamp; only entities created after this time
 	 *                 are included
@@ -1047,12 +1035,9 @@ public class AppUpgradeService implements IAppUpgradeService {
 	private void writeTestSuiteSql(BufferedWriter writer, Instant since) throws IOException {
 		List<TestSuite> testSuites = testSuiteRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
 		// Remove all TestSuites whose name matches any existing Module name
-		List<String> moduleNames = moduleRepository.findAll().stream()
-				.map(m -> m.getName())
-				.filter(java.util.Objects::nonNull)
-				.toList();
-		testSuites = testSuites.stream()
-				.filter(ts -> ts.getName() == null || !moduleNames.contains(ts.getName()))
+		List<String> moduleNames = moduleRepository.findAll().stream().map(m -> m.getName())
+				.filter(java.util.Objects::nonNull).toList();
+		testSuites = testSuites.stream().filter(ts -> ts.getName() == null || !moduleNames.contains(ts.getName()))
 				.toList();
 		for (TestSuite ts : testSuites) {
 			String id = String.format("'%s'", ts.getId().toString());
@@ -1190,6 +1175,8 @@ public class AppUpgradeService implements IAppUpgradeService {
 			String tmConfigFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
 					+ Constants.TM_CONFIG_FILE;
 			String currentVersion = commonService.getConfigProperty(new File(tmConfigFilePath), Constants.APP_VERSION);
+			String appUrl = commonService.getConfigProperty(new File(tmConfigFilePath), Constants.TM_URL);
+			String healthCheckUrl = appUrl + "actuator/health";
 			// If backup location is not provided, use default
 			if (backupLocation == null || backupLocation.isEmpty()) {
 				backupLocation = Constants.DEFAULT_BACKUP_LOCATION;
@@ -1208,10 +1195,18 @@ public class AppUpgradeService implements IAppUpgradeService {
 			String appUpgradeFileName = appUpgradeShellScriptFile.getName();
 
 			StringBuilder commandBuilder = new StringBuilder();
-			commandBuilder.append("cd ").append(appUpgradeFilePath).append(" && chmod 777 ./")
-					.append(Constants.APP_UPGRADE_WAR_FILE).append(" && nohup ./").append(appUpgradeFileName)
-					.append(" ").append(backupDir).append(" ").append(uploadLocation).append(" > /dev/null 2>&1 &");
+			commandBuilder.append("cp ").append(appUpgradeFilePath).append("/").append(Constants.APP_UPGRADE_WAR_FILE)
+					.append(" /opt/tomcat/webapps/ && ");
+			commandBuilder.append("cp ").append(appUpgradeFilePath).append("/app_upgrade_config_backup.sh")
+					.append(" /opt/tomcat/webapps/ && ");
 
+			commandBuilder.append("chmod 777 /opt/tomcat/webapps/").append(Constants.APP_UPGRADE_WAR_FILE)
+					.append(" && ");
+			commandBuilder.append("chmod 777 /opt/tomcat/webapps/app_upgrade_config_backup.sh && ");
+
+			commandBuilder.append("cd /opt/tomcat/webapps && nohup ./").append(Constants.APP_UPGRADE_WAR_FILE)
+					.append(" ").append(backupDir).append(" ").append(uploadLocation).append(" ").append(healthCheckUrl)
+					.append(" > /dev/null 2>&1 &");
 			String[] command = { "sh", "-c", commandBuilder.toString() };
 
 			LOGGER.info("ShellScript execute command: " + Arrays.toString(command));
