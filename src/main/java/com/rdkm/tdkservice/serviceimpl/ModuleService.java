@@ -22,6 +22,7 @@ package com.rdkm.tdkservice.serviceimpl;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -396,7 +397,12 @@ public class ModuleService implements IModuleService {
 
 		Category categoryEnum = commonService.validateCategory(category);
 		// Fetch all modules by category
-		List<Module> modules = moduleRepository.findAllByCategory(categoryEnum);
+		List<Module> modules = new ArrayList<>();
+		if (categoryEnum == Category.RDKV) {
+			modules = moduleRepository.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
+		} else {
+			modules = moduleRepository.findAllByCategory(Category.valueOf(category));
+		}
 
 		if (modules.isEmpty()) {
 			LOGGER.error("No modules found for category {}", category);
