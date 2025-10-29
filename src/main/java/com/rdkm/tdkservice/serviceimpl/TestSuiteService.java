@@ -208,12 +208,10 @@ public class TestSuiteService implements ITestSuiteService {
 				&& !(testSuiteDTO.getDescription().equals(testSuite.getDescription()))) {
 			testSuite.setDescription(testSuiteDTO.getDescription());
 		}
-		// If the category is changed in the Update DTO, then validate the category and
-		// set it to test suite
-		if (testSuiteDTO.getCategory() != null && testSuiteDTO.getCategory() != testSuite.getCategory().toString()) {
-			Category category = commonService.validateCategory(testSuiteDTO.getCategory());
-			testSuite.setCategory(category);
-		}
+
+		// Category update is conceptually not allowed for existing test suites, so we
+		// ignore it, as the scripts are already linked to the test suite with a
+		// specific category.
 
 		// Explicitly set the updatedAt timestamp and save the entity to ensure
 		// the updated time is persisted immediately, especially when changes
