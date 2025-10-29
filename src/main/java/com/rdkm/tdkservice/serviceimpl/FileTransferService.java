@@ -514,6 +514,19 @@ public class FileTransferService implements IFileService {
 			// Copy version logs into the specified directory
 			copyVersionLogsIntoDir(versionFilePath, executionID);
 
+			// Check if the version file has been transferred successfully
+			// If not, create the version file with the required details
+			// using script which fetches the image name
+			if (!checkIfThunderDisabledVersionFileIsTransfered(versionFilePath, executionID)) {
+				String thunderDisabledImageName = getTheThunderDisabledImageNameWithScript(device);
+
+				boolean versionFileStatus = createVersionFileWithImageName(versionFilePath, executionID,
+						thunderDisabledImageName);
+				LOGGER.info("Version file created with image name from the device using script: {}", versionFileStatus);
+			} else {
+				LOGGER.info("Version file transferred successfully for thunder disabled device.");
+			}
+
 			return true;
 		} catch (Exception e) {
 			LOGGER.error("Error occurred during version transfer script execution: {}", e.getMessage(), e);
@@ -983,6 +996,101 @@ public class FileTransferService implements IFileService {
 							executionId));
 		} catch (IOException e) {
 			LOGGER.error("Error while accessing log directory: {}", e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * This method checks if the version.txt file for thunder disabled devices has
+	 * been
+	 * transferred to the destination location
+	 * 
+	 * @param logTransferFilePath - log transfer file path specified for the
+	 *                            execution
+	 * @param executionId         - execution ID of the execution entity
+	 * @return boolean indicating whether the version file has been transferred
+	 */
+	private boolean checkIfThunderDisabledVersionFileIsTransfered(String logTransferFilePath, String executionId) {
+		String versionFileName = executionId + "_version.txt";
+		File dir = new File(logTransferFilePath);
+		if (!dir.exists() || !dir.isDirectory()) {
+			return false;
+		}
+		File versionFile = new File(dir, versionFileName);
+		return versionFile.exists() && versionFile.isFile();
+	}
+
+	/**
+	 * This method creates a version file with the image name at the specified
+	 * location
+	 * 
+	 * @param versionLogPath The path where the version file should be created
+	 * @param executionID    The execution ID used for naming the file
+	 * @param imageName      The image name to be saved in the file
+	 * @return boolean indicating success or failure of file creation
+	 */
+	private boolean createVersionFileWithImageName(String versionLogPath, String executionID, String imageName) {
+		try {
+			String versionFileName = executionID + "_version.txt";
+			File dir = new File(versionLogPath);
+
+			// Create directories if they don't exist
+			if (!dir.exists()) {
+				if (!dir.mkdirs()) {
+					LOGGER.error("Failed to create directory: {}", versionLogPath);
+					return false;
+				}
+				LOGGER.info("Created directory: {}", versionLogPath);
+			}
+
+			File versionFile = new File(dir, versionFileName);
+
+			// Create and write to the version file
+			try (FileWriter writer = new FileWriter(versionFile)) {
+				writer.write("imagename: " + imageName);
+				LOGGER.info("Version file created successfully at: {} with content: imagename: {}",
+						versionFile.getAbsolutePath(), imageName);
+				return true;
+			}
+
+		} catch (IOException e) {
+			LOGGER.error("Error creating version file with image name: {}", e.getMessage(), e);
+			return false;
+		}
+	}
+
+	/**
+	 * This method executes a Python script to get the image name for thunder
+	 * disabled devices
+	 * 
+	 * @param device The device entity containing IP and port information
+	 * @return The output from the Python script execution
+	 */
+	private String getTheThunderDisabledImageNameWithScript(Device device) {
+		try {
+			String scriptPath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
+					+ Constants.THUNDER_DISABLED_IMAGE_NAME_SCRIPT;
+			String pythonCommand = commonService.getPythonCommandFromConfig();
+
+			// Build command: python3 getimagename_cmndline.py <IP> <Port>
+			String[] command = {
+					pythonCommand,
+					scriptPath,
+					device.getIp(),
+					device.getPort()
+			};
+
+			LOGGER.info("Executing command: {} {} {} {}", pythonCommand, scriptPath, device.getIp(),
+					device.getPort().toString());
+
+			// Execute the script and get the output
+			String output = scriptExecutorService.executeScript(command, 10);
+			LOGGER.info("Script output: {}", output);
+
+			return output != null ? output.trim() : "";
+
+		} catch (Exception e) {
+			LOGGER.error("Error executing thunder disabled image name script: {}", e.getMessage(), e);
+			return "";
 		}
 	}
 
