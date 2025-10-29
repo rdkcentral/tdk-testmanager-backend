@@ -80,6 +80,7 @@ import com.rdkm.tdkservice.repository.ModuleRepository;
 import com.rdkm.tdkservice.repository.ScriptRepository;
 import com.rdkm.tdkservice.service.IExportExcelService;
 import com.rdkm.tdkservice.service.IFileService;
+import com.rdkm.tdkservice.service.IVersionService;
 import com.rdkm.tdkservice.service.utilservices.CommonService;
 import com.rdkm.tdkservice.util.Constants;
 import com.rdkm.tdkservice.util.MapperUtils;
@@ -131,6 +132,9 @@ public class ExportExcelService implements IExportExcelService {
 
 	@Autowired
 	private UserService userService;
+
+	@Autowired
+	private IVersionService versionService;
 
 	// Add looger
 	private static final Logger logger = LoggerFactory.getLogger(ExportExcelService.class);
@@ -396,7 +400,7 @@ public class ExportExcelService implements IExportExcelService {
 					: "N/A";
 			String executionTime = String.valueOf(execution.getExecutionTime());
 			String imageName = fileService.getImageName(String.valueOf(execution.getId()));
-			String tdkVersion = userService.getAppVersion();
+			String tdkVersion = versionService.getTdkCoreVersion();
 
 			if (imageName == null || imageName.isEmpty()) {
 				imageName = "Image not available"; // Assign a message if imageName is not found
@@ -1447,7 +1451,7 @@ public class ExportExcelService implements IExportExcelService {
 			totalSuccessCount += (int) device.get("totalSuccessCount");
 			totalNaCount += (int) device.get("totalNaCount");
 		}
-		String tdkVersion = userService.getAppVersion();
+		String tdkVersion = versionService.getTdkCoreVersion();
 		// Write consolidated data to the sheet
 		String[] headers = { "Device", "DeviceIP", "Execution Time (min)", "Image", "TDK Version" };
 		String[] values = { devices.toString(), deviceIPs.toString(), executionTimes.toString(), images.toString(),
@@ -1694,7 +1698,7 @@ public class ExportExcelService implements IExportExcelService {
 			// available
 			String overallPass = String.format("%.2f%%", overallSuccessPercentage);
 
-			String tdkVersion = userService.getAppVersion();
+			String tdkVersion = versionService.getTdkCoreVersion();
 			String[] deviceValues = { deviceName, deviceIp, executionTime, imageName, overallPass, tdkVersion };
 
 			// Create a bold style for headers
@@ -2048,7 +2052,7 @@ public class ExportExcelService implements IExportExcelService {
 		Cell tdkVersionCell = tdkVersionRow.createCell(1);
 		tdkVersionCell.setCellValue("TDK Version");
 		Cell tdkVersion = tdkVersionRow.createCell(2);
-		tdkVersion.setCellValue(userService.getAppVersion());
+		tdkVersion.setCellValue(versionService.getTdkCoreVersion());
 
 		// Add style to above two cells
 		CellStyle style = createArialStyle(workBook);

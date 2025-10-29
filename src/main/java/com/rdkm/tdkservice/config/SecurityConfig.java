@@ -77,7 +77,7 @@ public class SecurityConfig {
 							// proper REST API paths
 							.requestMatchers("/api/v1/auth/**", "/actuator/**", "/fileStore/**", "/execution/**",
 									"/deviceGroup/**", "/primitiveTest/**", "/api/v1/app-upgrade/**",
-									"/api/v1/script/**", "/api/v1/users/**")
+									"/api/v1/script/**", "/api/v1/users/**", "/api/v1/version/**")
 							.permitAll()
 							// Authorization based access control framework is added.
 							// Currently, the authorization based on roles is handled in the frontend.

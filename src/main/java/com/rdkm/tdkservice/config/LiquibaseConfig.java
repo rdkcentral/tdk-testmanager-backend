@@ -40,6 +40,12 @@ public class LiquibaseConfig {
     @Value("${spring.liquibase.change-log:classpath:db/changelogs/changelog-master.xml}")
     private String changeLog;
 
+    @Value("${spring.liquibase.database-change-log-table:changswithLiquibase}")
+    private String databaseChangeLogTable;
+
+    @Value("${spring.liquibase.database-change-log-lock-table:changswithLiquibaseLock}")
+    private String databaseChangeLogLockTable;
+
     /**
      * Creates SpringLiquibase bean for manual execution
      * This bean is created but doesn't run automatically due to
@@ -50,6 +56,8 @@ public class LiquibaseConfig {
         SpringLiquibase liquibase = new SpringLiquibase();
         liquibase.setDataSource(dataSource);
         liquibase.setChangeLog(changeLog);
+        liquibase.setDatabaseChangeLogTable(databaseChangeLogTable);
+        liquibase.setDatabaseChangeLogLockTable(databaseChangeLogLockTable);
         liquibase.setShouldRun(false); // Prevent automatic execution
         return liquibase;
     }

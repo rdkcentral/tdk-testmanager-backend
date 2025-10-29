@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>com.rdkm</groupId>
 	<artifactId>tdkservice</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>M141</version>
 	<name>tdkservice</name>
 	<description>TDK Service</description>
 	<packaging>war</packaging>
@@ -125,6 +125,13 @@
 	</dependencies>
 
 	<build>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
+	
 
 		<pluginManagement>
 			<plugins>

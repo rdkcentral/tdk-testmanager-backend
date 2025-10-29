@@ -19,7 +19,6 @@ http://www.apache.org/licenses/LICENSE-2.0
 */
 package com.rdkm.tdkservice.serviceimpl;
 
-import java.io.File;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -35,7 +34,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.rdkm.tdkservice.config.AppConfig;
 import com.rdkm.tdkservice.controller.LoginController;
 import com.rdkm.tdkservice.dto.ChangePasswordRequestDTO;
 import com.rdkm.tdkservice.dto.UserCreateDTO;
@@ -168,9 +166,8 @@ public class UserService implements UserDetailsService {
 		}
 		user.setTheme(theme);
 
-		UserGroup userGroup = userGroupRepository.findByName(userRequest.getUserGroupName());
-		if (null != userGroup)
-			user.setUserGroup(userGroup);
+		// User group assignment is skipped during user creation
+		// TODO: User group needs to be removed in the future
 
 		// Setting user status to pending during the registration
 		user.setStatus(Constants.USER_PENDING);
@@ -429,32 +426,6 @@ public class UserService implements UserDetailsService {
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException(Constants.USER_ID, userId.toString()));
 		return user.getTheme().name();
-	}
-
-	/**
-	 * This method is used to get the app version
-	 * 
-	 * @return String - returns the app version
-	 */
-	public String getAppVersion() {
-		LOGGER.info("Getting the current app version");
-
-		String tmConfigFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
-				+ Constants.TM_CONFIG_FILE;
-		String appVersion;
-		try {
-			appVersion = commonService.getConfigProperty(new File(tmConfigFilePath), Constants.APP_VERSION);
-		} catch (Exception e) {
-			LOGGER.error("Error occurred while getting the app version from the configuration file", e);
-			throw new TDKServiceException("Failed to get app version" + e.getMessage());
-		}
-
-		if (appVersion == null) {
-			LOGGER.error("App version is null");
-			throw new UserInputException("App version not configured");
-		}
-
-		return appVersion;
 	}
 
 }
