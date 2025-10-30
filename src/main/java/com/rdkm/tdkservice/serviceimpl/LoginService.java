@@ -117,6 +117,7 @@ public class LoginService implements ILoginService {
 		User user = userRepository.findByUsername(signinRequest.getUsername());
 
 		// TODO: Once the user status is implemented from the front end , uncomment this
+		// So only the approved users can login
 		// if (user.getStatus() == Constants.USER_PENDING) {
 		// LOGGER.error("User account is pending: " + user.getUsername());
 		// throw new UserInputException("User account is pending: " + user.getUsername()

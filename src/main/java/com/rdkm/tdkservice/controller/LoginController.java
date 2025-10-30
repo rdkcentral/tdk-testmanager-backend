@@ -145,7 +145,9 @@ public class LoginController {
 	 * userGroupService to get a list of all UserGroupDTO objects. Then, it uses a
 	 * stream to map each UserGroupDTO to its name and collects these names into a
 	 * list. Finally, it returns a ResponseEntity containing this list of user group
-	 * names. TODO : Not valid now, UserGroup is not planned for initial release
+	 * names.
+	 * TODO : Not valid now, UserGroup is not planned for initial release or may be
+	 * removed in the future
 	 * 
 	 * 
 	 * @return ResponseEntity containing a list of user group names
