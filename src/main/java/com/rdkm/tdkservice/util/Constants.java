@@ -314,7 +314,7 @@ public class Constants {
 	public static final String HEADER_FINDER = "If not stated otherwise in this file or this component's LICENSE";
 	// Header template
 	public static final String HEADER_TEMPLATE = "##########################################################################\r\n"
-			+ "# If not stated otherwise in this file or this component's LICENSE\r\n"
+			+ "# If not stated otherwise in this file or this component's Licenses.txt\r\n"
 			+ "# file the following copyright and licenses apply:\r\n" + "#\r\n"
 			+ "# Copyright CURRENT_YEAR RDK Management\r\n" + "#\r\n"
 			+ "# Licensed under the Apache License, Version 2.0 (the \"License\");\r\n"

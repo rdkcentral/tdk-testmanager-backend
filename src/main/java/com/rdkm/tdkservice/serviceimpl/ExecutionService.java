@@ -906,29 +906,42 @@ public class ExecutionService implements IExecutionService {
 			ExecutionMethodResult executionMethodResult = new ExecutionMethodResult();
 			String actualResult = resultData;
 			if (resultStatus.equals(Constants.STATUS_NONE) || Utils.isEmpty(resultStatus)) {
-				executionMethodResult.setMethodResult(ExecutionMethodResultStatus.valueOf(actualResult));
+				executionMethodResult.setMethodResult(convertToMethodResultStatus(actualResult));
 			} else {
 				executionMethodResult.setExecutionResult(executionResult);
-				executionMethodResult.setExpectedResult(ExecutionMethodResultStatus.valueOf(expectedResult));
-				executionMethodResult.setActualResult(ExecutionMethodResultStatus.valueOf(actualResult));
-				executionMethodResult.setMethodResult(ExecutionMethodResultStatus.valueOf(resultStatus));
+				executionMethodResult.setExpectedResult(convertToMethodResultStatus(expectedResult));
+				executionMethodResult.setActualResult(convertToMethodResultStatus(actualResult));
+				executionMethodResult.setMethodResult(convertToMethodResultStatus(resultStatus));
 			}
 			executionMethodResult.setFunctionName(testCaseName);
 			executionMethodResultRepository.save(executionMethodResult);
 
-			// If the result in Execution and ExecutionResult is already failure from
-			// anyone of the test case, then don't update the status. Because the status is
-			// already failed
-			if ((null == executionResult.getResult())
-					|| (!executionResult.getResult().equals(ExecutionResultStatus.FAILURE))) {
-				executionResult.setResult(ExecutionResultStatus.valueOf(resultStatus));
+			// Handle NA case: Set ExecutionResult as NA but overall execution as SUCCESS
+			if ("N/A".equalsIgnoreCase(resultStatus) || "NA".equalsIgnoreCase(resultStatus)) {
+				// Set ExecutionResult as NA
+				executionResult.setResult(ExecutionResultStatus.NA);
 				executionResultRepository.save(executionResult);
+
+				// Set overall execution as SUCCESS only if it's not already FAILURE
 				if ((null == execution.getResult())
 						|| !(execution.getResult().equals(ExecutionOverallResultStatus.FAILURE))) {
-					execution.setResult(ExecutionOverallResultStatus.valueOf(resultStatus));
+					execution.setResult(ExecutionOverallResultStatus.SUCCESS);
 					executionRepository.save(execution);
 				}
-
+			} else {
+				// If the result in Execution and ExecutionResult is already failure from
+				// anyone of the test case, then don't update the status. Because the status is
+				// already failed
+				if ((null == executionResult.getResult())
+						|| (!executionResult.getResult().equals(ExecutionResultStatus.FAILURE))) {
+					executionResult.setResult(ExecutionResultStatus.valueOf(resultStatus));
+					executionResultRepository.save(executionResult);
+					if ((null == execution.getResult())
+							|| !(execution.getResult().equals(ExecutionOverallResultStatus.FAILURE))) {
+						execution.setResult(ExecutionOverallResultStatus.valueOf(resultStatus));
+						executionRepository.save(execution);
+					}
+				}
 			}
 			executionResultRepository.save(executionResult);
 
@@ -941,6 +954,33 @@ public class ExecutionService implements IExecutionService {
 
 		}
 		return true;
+	}
+
+	/**
+	 * This method is used to convert the string value to
+	 * ExecutionMethodResultStatus enum
+	 * 
+	 * @param value - the string value
+	 * @return ExecutionMethodResultStatus - the ExecutionMethodResultStatus enum
+	 */
+	private ExecutionMethodResultStatus convertToMethodResultStatus(String value) {
+		if (value == null || value.trim().isEmpty()) {
+			return null;
+		}
+
+		String normalizedValue = value.trim().toUpperCase();
+
+		// Handle N/A case by converting to NA
+		if ("N/A".equals(normalizedValue)) {
+			return ExecutionMethodResultStatus.NA;
+		}
+
+		// Handle other standard cases
+		try {
+			return ExecutionMethodResultStatus.valueOf(normalizedValue);
+		} catch (Exception e) {
+			throw new TDKServiceException("Invalid ExecutionMethodResultStatus: " + value);
+		}
 	}
 
 	/**
