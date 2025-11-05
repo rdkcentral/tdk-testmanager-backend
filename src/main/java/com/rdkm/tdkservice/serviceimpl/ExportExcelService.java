@@ -2500,15 +2500,15 @@ public class ExportExcelService implements IExportExcelService {
 				logLinkCellValue.setCellStyle(linkStyle);
 				autoSizeColumns(sheet, 0, 4);
 
-				sheet.setColumnWidth(0, 256 * 7);
-				sheet.setColumnWidth(1, 256 * 55);
-				sheet.setColumnWidth(2, 256 * 12);
-				sheet.setColumnWidth(3, 256 * 40);
-				sheet.setColumnWidth(4, 256 * 70);
-				sheet.setColumnWidth(5, 256 * 12);
-				sheet.setColumnWidth(6, 256 * 15);
-				sheet.setColumnWidth(7, 256 * 30);
 			}
+			sheet.setColumnWidth(0, 256 * 7);
+			sheet.setColumnWidth(1, 256 * 55);
+			sheet.setColumnWidth(2, 256 * 12);
+			sheet.setColumnWidth(3, 256 * 40);
+			sheet.setColumnWidth(4, 256 * 70);
+			sheet.setColumnWidth(5, 256 * 12);
+			sheet.setColumnWidth(6, 256 * 15);
+			sheet.setColumnWidth(7, 256 * 30);
 		}
 	}
 

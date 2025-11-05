@@ -25,5 +25,5 @@ package com.rdkm.tdkservice.enums;
  */
 
 public enum ExecutionMethodResultStatus {
-	SUCCESS, FAILURE
+	SUCCESS, FAILURE ,NA
 }
