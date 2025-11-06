@@ -1,0 +1,60 @@
+/*
+* If not stated otherwise in this file or this component's LICENSE file the
+* following copyright and licenses apply:
+*
+* Copyright 2024 RDK Management
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*
+http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+package com.rdkm.tdkservice.dto;
+
+import com.rdkm.tdkservice.enums.ParameterDataType;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+/**
+ * Data Transfer Object for creating a new parameter type.
+ */
+@Data
+public class ParameterCreateDTO {
+
+	/**
+	 * The name of the parameter type.
+	 */
+	@NotBlank(message = "Name is required")
+	private String parameterName;
+
+	/**
+	 * The enumeration of the parameter type.
+	 */
+	private ParameterDataType parameterDataType;
+
+	/**
+	 * The range value of the parameter type.
+	 */
+	@NotBlank(message = "Range value is required")
+	private String parameterRangeVal;
+
+	/**
+	 * The function associated with the parameter type.
+	 */
+	@NotBlank(message = "Function is required")
+	private String function;
+
+	/*
+	 * The Category of the parameter
+	 */
+	private String parameterCategory;
+}
