@@ -192,7 +192,8 @@ public class ExportExcelService implements IExportExcelService {
 			List<ExecutionResult> execResults = entry.getValue();
 			Module module = moduleRepository.findByName(moduleName);
 
-			if (module.getName().equalsIgnoreCase("rdkservices")) {
+			if (module.getName().equalsIgnoreCase("rdkservices")
+					|| module.getName().equalsIgnoreCase("vendor_test_suite")) {
 				List<String> logDatas = new ArrayList<>();
 				Map<ExecutionResult, String> execResultLogMap = new LinkedHashMap<>();
 				for (ExecutionResult executionResult : execResults) {
@@ -231,7 +232,8 @@ public class ExportExcelService implements IExportExcelService {
 			for (Map.Entry<String, List<Map<String, Object>>> entrys : modulesGrouped.entrySet()) {
 				String modName = entrys.getKey();
 				Module moduleObj = moduleRepository.findByName(modName);
-				if (!moduleObj.getName().equalsIgnoreCase("rdkservices")) {
+				if (!moduleObj.getName().equalsIgnoreCase("rdkservices")
+						&& !moduleObj.getName().equalsIgnoreCase("vendor_test_suite")) {
 					List<Map<String, Object>> moduleScripts = entrys.getValue();
 					createModuleSheet(moduleScripts, workbook, modName);
 				}
@@ -305,11 +307,11 @@ public class ExportExcelService implements IExportExcelService {
 		List<ExecutionResult> scriptsWithPluginData = new ArrayList<>();
 
 		// Define the pattern to extract the required information
-		Pattern pattern = Pattern.compile("======================== PLUGIN TEST SUMMARY ======================\\r?\\n"
+		Pattern pattern = Pattern.compile(".*?[=\\s]*PLUGIN TEST SUMMARY[=\\s]*\\r?\\n"
 				+ "PLUGIN NAME\\s*:\\s*(.*?)\\r?\\n" + "TOTAL TESTS\\s*:\\s*(\\d+)\\r?\\n"
 				+ "EXECUTED TESTS\\s*:\\s*(\\d+)\\r?\\n" + "PASSED TESTS\\s*:\\s*(\\d+)\\r?\\n"
-				+ "FAILED TESTS\\s*:\\s*(\\d+)\\r?\\n" + "N/A TESTS\\s*:\\s*(\\d+)\\r?\\n" + "\\r?\\n"
-				+ "Final Plugin Tests Status\\s*:\\s*(.*?)\\r?\\n", Pattern.DOTALL);
+				+ "FAILED TESTS\\s*:\\s*(\\d+)\\r?\\n" + "N/A TESTS\\s*:\\s*(\\d+)\\r?\\n" + "(?:\\r?\\n)?"
+				+ "(?:Final Plugin Tests Status\\s*:\\s*(.*?)\\r?\\n)?", Pattern.DOTALL);
 		List<String> pluginLogs = new ArrayList<>();
 		for (Map.Entry<ExecutionResult, String> scriptLog : execResultLogMap.entrySet()) {
 			Matcher matcher = pattern.matcher(scriptLog.getValue());
@@ -492,7 +494,8 @@ public class ExportExcelService implements IExportExcelService {
 			for (String moduleName : moduleNames) {
 
 				Module moduleObj = moduleRepository.findByName(moduleName);
-				if (!moduleObj.getName().equalsIgnoreCase("rdkservices")) {
+				if (!moduleObj.getName().equalsIgnoreCase("rdkservices")
+						&& !moduleObj.getName().equalsIgnoreCase("vendor_test_suite")) {
 					Row row = sheet.createRow(rowNum++);
 
 					// Populate Sl No
@@ -1001,23 +1004,23 @@ public class ExportExcelService implements IExportExcelService {
 				for (Map<String, Object> scriptData : moduleScripts) {
 					ExecutionResultStatus status = (ExecutionResultStatus) scriptData.get("status");
 					switch (status) {
-						case SUCCESS:
-							success++;
-							break;
-						case FAILURE:
-							failure++;
-							break;
-						case TIMEOUT:
-							timeout++;
-							break;
-						case NA:
-							notApplicable++;
-							break;
-						case SKIPPED:
-							skipped++;
-							break;
-						default:
-							LOGGER.warn("Unknown result status: {}", status);
+					case SUCCESS:
+						success++;
+						break;
+					case FAILURE:
+						failure++;
+						break;
+					case TIMEOUT:
+						timeout++;
+						break;
+					case NA:
+						notApplicable++;
+						break;
+					case SKIPPED:
+						skipped++;
+						break;
+					default:
+						LOGGER.warn("Unknown result status: {}", status);
 					}
 				}
 
@@ -2327,7 +2330,7 @@ public class ExportExcelService implements IExportExcelService {
 
 			Pattern entirePreReqSectionPattern = Pattern
 					.compile("#---------------------------- Plugin Pre-requisite ----------------------------#\\r?\\n"
-							+ "(.*?)" + "Plugin Pre-requisite Status\\s*:\\s*\\w+\\r?\\n", Pattern.DOTALL);
+							+ "(.*?)" + "Plugin Pre-requisite Status\\s*:\\s*\\w+\\s*\\r?\\n", Pattern.DOTALL);
 
 			// Then, pattern to match each individual pre-requisite block within the section
 			Pattern individualPreReqPattern = Pattern
@@ -2399,7 +2402,7 @@ public class ExportExcelService implements IExportExcelService {
 			createAndStyleArialHeaders(sheet, rowNum++, testCaseHeaders, 0);
 			// Parse test cases and populate rows
 			Pattern testCasePattern = Pattern.compile(
-					"TEST CASE NAME\\s*:\\s*(.*?)\\n.*?TEST CASE ID\\s*:\\s*(.*?)\\n.*?DESCRIPTION\\s*:\\s*(.*?)\\n.*?##--------- \\[TEST EXECUTION STATUS\\]\\s*:\\s*(.*?)\\s*----------##",
+					"TEST CASE NAME\\s*:\\s*(.*?)\\n.*?TEST CASE ID\\s*:\\s*(.*?)\\n.*?##--------- \\[TEST EXECUTION STATUS\\]\\s*:\\s*(.*?)\\s*----------##",
 					Pattern.DOTALL);
 			Matcher testCaseMatcher = testCasePattern.matcher(logData);
 			int testCaseNum = 1;
@@ -2407,7 +2410,7 @@ public class ExportExcelService implements IExportExcelService {
 				Row row = sheet.createRow(rowNum++);
 				row.createCell(0).setCellValue(testCaseNum++);
 				row.createCell(1).setCellValue(testCaseMatcher.group(1).trim());
-				row.createCell(2).setCellValue(testCaseMatcher.group(4).trim());
+				row.createCell(2).setCellValue(testCaseMatcher.group(3).trim());
 				row.createCell(3).setCellValue(formatExecutionDateToUTC(createdDate.toString()));
 				row.createCell(4).setCellValue(testCaseMatcher.group(0).trim());
 				if (analysis != null) {
@@ -2433,11 +2436,12 @@ public class ExportExcelService implements IExportExcelService {
 			sheet.createRow(rowNum++);
 			Pattern entirePostReqSectionPattern = Pattern
 					.compile("#---------------------------- Plugin Post-requisite ----------------------------#\\r?\\n"
-							+ "(.*?)" + "Plugin Post-requisite Status\\s*:\\s*\\w+\\r?\\n", Pattern.DOTALL);
-			// Parse post-requisites and populate rows (if any)
-			Pattern postReqPattern = Pattern.compile(
-					"Post Requisite : (.*?)\\n.*?#--------- \\[Post-requisite Status\\] : (.*?) ----------#",
-					Pattern.DOTALL);
+							+ "(.*?)" + "Plugin Post-requisite Status\\s*:\\s*\\w+\\s*\\r?\\n", Pattern.DOTALL);
+			Pattern postReqPattern = Pattern
+					.compile(
+							"Post Requisite\\s*:\\s*(.*?)\\r?\\n" + "Post Requisite No\\s*:\\s*(\\d+)\\r?\\n" + "(.*?)"
+									+ "#--------- \\[Post-requisite Status\\]\\s*:\\s*(.*?)\\s*----------#",
+							Pattern.DOTALL);
 			Matcher postReqMatcher = entirePostReqSectionPattern.matcher(logData);
 			if (postReqMatcher.find()) {
 				String entirePostReqSection = postReqMatcher.group(1);
@@ -2459,7 +2463,7 @@ public class ExportExcelService implements IExportExcelService {
 					Row row = sheet.createRow(rowNum++);
 					row.createCell(0).setCellValue(postReqNum++);
 					row.createCell(1).setCellValue(individualPostReqMatcher.group(1).trim());
-					row.createCell(2).setCellValue(individualPostReqMatcher.group(2).trim());
+					row.createCell(2).setCellValue(individualPostReqMatcher.group(4).trim());
 					row.createCell(3).setCellValue(formatExecutionDateToUTC(createdDate.toString()));
 					row.createCell(4).setCellValue(individualPostReqMatcher.group(0).trim());
 					if (analysis != null) {
@@ -2522,7 +2526,7 @@ public class ExportExcelService implements IExportExcelService {
 	 */
 	private void summaryForScriptsWithoutPluginData(List<ExecutionResult> failedScripts, Sheet sheet, int rowCount) {
 
-		String rdkserviceModuleSummary = "RDKSERVICE Module Summary";
+		String rdkserviceModuleSummary = "Module Summary";
 		Row rowForRdkserviceModule = sheet.createRow(rowCount++);
 		Cell headCellForRdkServiceModule = rowForRdkserviceModule.createCell(3);
 		headCellForRdkServiceModule.setCellValue(rdkserviceModuleSummary);
@@ -2536,7 +2540,7 @@ public class ExportExcelService implements IExportExcelService {
 
 		Cell warningMessage = rowForRdkserviceModule.createCell(5);
 		warningMessage.setCellValue(
-				"Below RDKServices scripts  did not run \n. Without logs, plugin-based data could not be rendered,\n so module-wise data was added");
+				"Below scripts  did not run \n. Without logs, plugin-based data could not be rendered,\n so module-wise data was added");
 		CellStyle warningMessageStyle = sheet.getWorkbook().createCellStyle();
 		Font warningMessageFont = sheet.getWorkbook().createFont();
 		// set colour to this text as red
@@ -2757,7 +2761,7 @@ public class ExportExcelService implements IExportExcelService {
 	 */
 	private int pluginSummaryData(List<String> logData, Sheet sheet, int rowCount, Pattern pattern) {
 
-		String heading = "RDKSERVICE Summary";
+		String heading = "Module Summary";
 		Row rowHead = sheet.createRow(rowCount++);
 		Cell headCells = rowHead.createCell(3);
 		headCells.setCellValue(heading);
@@ -2912,8 +2916,10 @@ public class ExportExcelService implements IExportExcelService {
 		if (input.length() > 32000) {
 			String logUrl = "N/A";
 			if (executionResult != null) {
-				String serverUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
-				logUrl = serverUrl + "/execution/getExecutionLogs?executionResultID=" + executionResult.getId();
+				File tmConfigFile = new File(
+						AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR + Constants.TM_CONFIG_FILE);
+				logUrl = commonService.getConfigProperty(tmConfigFile, Constants.TM_URL)
+						+ "/execution/getExecutionLogs?executionResultID=" + executionResult.getId();
 				LOGGER.info(
 						"Log data exceeds Excel cell limit, truncating to 32000 characters and providing a link to view full log. Length: {}, ExecutionResultID: {}, URL: {}",
 						input.length(), executionResult.getId(), logUrl);
