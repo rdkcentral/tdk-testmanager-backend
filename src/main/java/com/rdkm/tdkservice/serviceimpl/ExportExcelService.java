@@ -307,15 +307,21 @@ public class ExportExcelService implements IExportExcelService {
 		List<ExecutionResult> scriptsWithPluginData = new ArrayList<>();
 
 		// Define the pattern to extract the required information
-		Pattern pattern = Pattern.compile(".*?[=\\s]*PLUGIN TEST SUMMARY[=\\s]*\\r?\\n"
-				+ "PLUGIN NAME\\s*:\\s*(.*?)\\r?\\n" + "TOTAL TESTS\\s*:\\s*(\\d+)\\r?\\n"
-				+ "EXECUTED TESTS\\s*:\\s*(\\d+)\\r?\\n" + "PASSED TESTS\\s*:\\s*(\\d+)\\r?\\n"
-				+ "FAILED TESTS\\s*:\\s*(\\d+)\\r?\\n" + "N/A TESTS\\s*:\\s*(\\d+)\\r?\\n" + "(?:\\r?\\n)?"
-				+ "(?:Final Plugin Tests Status\\s*:\\s*(.*?)\\r?\\n)?", Pattern.DOTALL);
+		Pattern pattern = Pattern.compile("PLUGIN\\s+TEST\\s+SUMMARY[\\s=]*\\r?\\n" + // Direct match without .*?
+				"PLUGIN\\s+NAME\\s*[:\\-]\\s*([^\\r\\n]+)\\r?\\n" + "TOTAL\\s+TESTS\\s*[:\\-]\\s*(\\d+)\\r?\\n"
+				+ "EXECUTED\\s+TESTS\\s*[:\\-]\\s*(\\d+)\\r?\\n" + "PASSED\\s+TESTS\\s*[:\\-]\\s*(\\d+)\\r?\\n"
+				+ "FAILED\\s+TESTS\\s*[:\\-]\\s*(\\d+)\\r?\\n" + "N/A\\s+TESTS\\s*[:\\-]\\s*(\\d+)\\r?\\n"
+				+ "(?:\\r?\\n)?" + "(?:Final\\s+Plugin\\s+Tests\\s+Status\\s*[:\\-]\\s*([^\\r\\n]+)\\r?\\n)?",
+				Pattern.CASE_INSENSITIVE | Pattern.MULTILINE); // Use MULTILINE instead of DOTALL
+
+		// Simpler fallback pattern for plugin name only
+		Pattern pluginNamePattern = Pattern.compile("PLUGIN\\s+NAME\\s*[:\\-]\\s*([^\\r\\n]+)(?:\\r?\\n|$)",
+				Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 		List<String> pluginLogs = new ArrayList<>();
 		for (Map.Entry<ExecutionResult, String> scriptLog : execResultLogMap.entrySet()) {
 			Matcher matcher = pattern.matcher(scriptLog.getValue());
-			if (!matcher.find()) {
+			Matcher pluginNameMatcher = pluginNamePattern.matcher(scriptLog.getValue());
+			if (!matcher.find() && !pluginNameMatcher.find()) {
 				scriptsWithoutPluginData.add(scriptLog.getKey());
 			} else {
 				pluginLogs.add(scriptLog.getValue());
@@ -2785,11 +2791,17 @@ public class ExportExcelService implements IExportExcelService {
 		int failureTestCasesSum = 0;
 		int naTestCasesSum = 0;
 		int slNo = 1;
+		// Add pattern match if any exception occures without plugin summary data for
+		// PLUGIN NAME
+		Pattern pluginNamePattern = Pattern.compile("PLUGIN NAME\\s*:\\s*(.+?)(?:\\r?\\n|$)", Pattern.CASE_INSENSITIVE);
+
 		for (String log : logData) {
 			Matcher matcher = pattern.matcher(log);
+			boolean foundMatch = false;
 			// Create a row for each match
 
 			while (matcher.find()) {
+				foundMatch = true;
 				Row row = sheet.createRow(rowCount++);
 				row.createCell(0).setCellValue(slNo++);
 				Cell pluginCell = row.createCell(1);
@@ -2818,20 +2830,117 @@ public class ExportExcelService implements IExportExcelService {
 					row.getCell(i).setCellStyle(createArialStyle(sheet.getWorkbook()));
 				}
 
-				// I need to get the sum of all the test cases , executed test cases, success
-				int totalTestCases = Integer.parseInt(matcher.group(2).trim());
-				int executedTestCases = Integer.parseInt(matcher.group(3).trim());
-				int successTestCases = Integer.parseInt(matcher.group(4).trim());
-				int failureTestCases = Integer.parseInt(matcher.group(5).trim());
-				int naTestCases = Integer.parseInt(matcher.group(6).trim());
-
-				// i need to add up for each finder
-				totalTestCasesSum += totalTestCases;
-				executedTestCasesSum += executedTestCases;
-				successTestCasesSum += successTestCases;
-				failureTestCasesSum += failureTestCases;
-				naTestCasesSum += naTestCases;
+				totalTestCasesSum += Integer.parseInt(matcher.group(2).trim());
+				executedTestCasesSum += Integer.parseInt(matcher.group(3).trim());
+				successTestCasesSum += Integer.parseInt(matcher.group(4).trim());
+				failureTestCasesSum += Integer.parseInt(matcher.group(5).trim());
+				naTestCasesSum += Integer.parseInt(matcher.group(6).trim());
 			}
+			// If main pattern didn't match, try fallback pattern
+			if (!foundMatch) {
+				Matcher pluginNameMatcher = pluginNamePattern.matcher(log);
+				if (pluginNameMatcher.find()) {
+					String pluginName = pluginNameMatcher.group(1).trim();
+
+					// Initialize counters
+					int timeoutScriptTestCaseCount = 0;
+					int timeoutScriptTestCaseExecutedCount = 0;
+					int timeoutScriptTestCaseSuccessCount = 0;
+					int timeoutScriptTestCaseFailureCount = 0;
+					int timeoutScriptTestCaseNaCount = 0;
+					int timeoutScriptTestCaseDetailsPresentCount = 0;
+
+					// Extract plugin total test cases
+					Pattern pluginTotalPattern = Pattern.compile("PLUGIN TOTAL TEST CASES:\\s*(\\d+)",
+							Pattern.CASE_INSENSITIVE);
+					Matcher totalMatcher = pluginTotalPattern.matcher(log);
+					if (totalMatcher.find()) {
+						timeoutScriptTestCaseCount = Integer.parseInt(totalMatcher.group(1).trim());
+					}
+
+					// Extract test case names and analyze them
+					Pattern testCaseNamePattern = Pattern.compile("TEST CASE NAME\\s*:\\s*([^\\r\\n]+)",
+							Pattern.CASE_INSENSITIVE);
+					Matcher testCaseNameMatcher = testCaseNamePattern.matcher(log);
+
+					while (testCaseNameMatcher.find()) {
+						String testCaseName = testCaseNameMatcher.group(1).trim();
+
+						// Look for test case details
+						Pattern testCaseDetailsPattern = Pattern.compile(
+								Pattern.quote(testCaseName) + "(.*?)----------##",
+								Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+						Matcher detailsMatcher = testCaseDetailsPattern.matcher(log);
+
+						if (detailsMatcher.find()) {
+							timeoutScriptTestCaseDetailsPresentCount++;
+
+							if (timeoutScriptTestCaseCount == 0) {
+								timeoutScriptTestCaseCount++;
+							}
+
+							String testCaseDetails = detailsMatcher.group(1);
+							Pattern statusPattern = Pattern.compile("\\[TEST EXECUTION STATUS\\]\\s*:\\s*([\\w/]+)",
+									Pattern.CASE_INSENSITIVE);
+							Matcher statusMatcher = statusPattern.matcher(testCaseDetails);
+
+							if (statusMatcher.find()) {
+								String testCaseStatus = statusMatcher.group(1).trim();
+
+								if ("SUCCESS".equalsIgnoreCase(testCaseStatus)) {
+									timeoutScriptTestCaseSuccessCount++;
+								} else if ("FAILURE".equalsIgnoreCase(testCaseStatus)) {
+									timeoutScriptTestCaseFailureCount++;
+								} else if ("N/A".equalsIgnoreCase(testCaseStatus)
+										|| "NOT_APPLICABLE".equalsIgnoreCase(testCaseStatus)) {
+									timeoutScriptTestCaseNaCount++;
+								}
+							}
+						}
+					}
+
+					timeoutScriptTestCaseExecutedCount = timeoutScriptTestCaseDetailsPresentCount
+							- timeoutScriptTestCaseNaCount;
+
+					// Create row for this plugin
+					Row row = sheet.createRow(rowCount++);
+					row.createCell(0).setCellValue(slNo++);
+
+					Cell pluginCell = row.createCell(1);
+					pluginCell.setCellValue(pluginName.toLowerCase());
+					CreationHelper creationHelper = sheet.getWorkbook().getCreationHelper();
+					Hyperlink link = creationHelper.createHyperlink(HyperlinkType.DOCUMENT);
+					link.setAddress("'" + pluginName.toLowerCase() + "'!A1");
+					pluginCell.setHyperlink(link);
+
+					CellStyle linkStyle = sheet.getWorkbook().createCellStyle();
+					Font linkFont = sheet.getWorkbook().createFont();
+					linkFont.setUnderline(Font.U_SINGLE);
+					linkFont.setColor(IndexedColors.BLUE.getIndex());
+					linkFont.setFontName("Arial");
+					linkStyle.setFont(linkFont);
+					pluginCell.setCellStyle(linkStyle);
+
+					row.createCell(2).setCellValue("TIMEOUT"); // Default script status for fallback
+					row.createCell(3).setCellValue(timeoutScriptTestCaseCount);
+					row.createCell(4).setCellValue(timeoutScriptTestCaseExecutedCount);
+					row.createCell(5).setCellValue(timeoutScriptTestCaseSuccessCount);
+					row.createCell(6).setCellValue(timeoutScriptTestCaseFailureCount);
+					row.createCell(7).setCellValue(timeoutScriptTestCaseNaCount);
+
+					for (int i = 2; i < 8; i++) {
+						row.getCell(i).setCellStyle(createArialStyle(sheet.getWorkbook()));
+					}
+
+					// Add to sums
+					totalTestCasesSum += timeoutScriptTestCaseCount;
+					executedTestCasesSum += timeoutScriptTestCaseExecutedCount;
+					successTestCasesSum += timeoutScriptTestCaseSuccessCount;
+					failureTestCasesSum += timeoutScriptTestCaseFailureCount;
+					naTestCasesSum += timeoutScriptTestCaseNaCount;
+				}
+			}
+
 		}
 
 		// Create a row for the total
