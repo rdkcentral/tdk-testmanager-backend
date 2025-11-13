@@ -2457,72 +2457,75 @@ public class ExecutionService implements IExecutionService {
 	 * @return the list of executions based on the filter criteria
 	 */
 	private List<Execution> getFilteredExecutions(ExecutionSearchFilterDTO filterRequest) {
-		LOGGER.info("Filtering the execution list based on the filter criteria ");
-		try {
-			// Validate the Category
-			Category category = Category.valueOf(filterRequest.getCategory().toUpperCase());
-			if (category == null) {
-				throw new UserInputException("Invalid category name provided");
-			}
+    LOGGER.info("Filtering the execution list based on the filter criteria ");
+    try {
+        // Validate the Category
+        Category category = Category.valueOf(filterRequest.getCategory().toUpperCase());
+        if (category == null) {
+            throw new UserInputException("Invalid category name provided");
+        }
 
-			// Add page limit to the pageable object
-			Pageable pageable = Pageable.unpaged();
-			if (filterRequest.getSizeLimit() > 0) {
-				pageable = PageRequest.of(0, filterRequest.getSizeLimit());
-			} else {
-				// If no size limit added, the add without any limit
-				pageable = Pageable.unpaged();
-			}
+        // Add page limit to the pageable object
+        Pageable pageable = Pageable.unpaged();
+        if (filterRequest.getSizeLimit() > 0) {
+            pageable = PageRequest.of(0, filterRequest.getSizeLimit());
+        } else {
+            // If no size limit added, the add without any limit
+            pageable = Pageable.unpaged();
+        }
 
-			// Only SUCCESS and FAILURE status are allowed
-			List<ExecutionOverallResultStatus> executionStatuses = Arrays.asList(ExecutionOverallResultStatus.SUCCESS,
-					ExecutionOverallResultStatus.FAILURE);
+        // Only SUCCESS and FAILURE status are allowed
+        List<ExecutionOverallResultStatus> executionStatuses = Arrays.asList(ExecutionOverallResultStatus.SUCCESS,
+                ExecutionOverallResultStatus.FAILURE);
 
-			List<Execution> executions = null;
+        List<Execution> executions = null;
 
-			// The case where the execution type is not provided and script test suite is
-			// not provided
-			if ((Utils.isEmpty(filterRequest.getExecutionType()))
-					&& (Utils.isEmpty(filterRequest.getScriptTestSuite()))) {
-				LOGGER.info("Fetching execution list based on category, start date, end date and status");
-				executions = executionRepository.getExecutionListByFilter(category, filterRequest.getStartDate(),
-						filterRequest.getEndDate(), executionStatuses, pageable);
-			} else if (!Utils.isEmpty(filterRequest.getExecutionType())) {
-				LOGGER.info(
-						"Fetching execution list based on category, start date, end date, status and execution type");
-				ExecutionType executionType = ExecutionType.valueOf(filterRequest.getExecutionType().toUpperCase());
-				if (executionType == null) {
-					throw new UserInputException("Invalid execution type provided");
-				}
-				// The case where the execution type is provided and script test suite is not
-				// provided
-				if (Utils.isEmpty(filterRequest.getScriptTestSuite())) {
-					executions = executionRepository.getExecutionListByFilterWithExecutionType(category,
-							filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses, executionType,
-							pageable);
-				} else {
-					// The case where the execution type and script test suite are provided
-					if (executionType == ExecutionType.TESTSUITE || executionType == ExecutionType.SINGLESCRIPT) {
-						// The case where the execution type is testsuite or singlescript
-						executions = executionRepository.getExecutionListByFilterWithExecutionTypeAndSuitescript(
-								category, filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses,
-								executionType, filterRequest.getScriptTestSuite(), pageable);
-					} else {
-						// The case where the execution type is Multiscript
-						executions = executionRepository.getExecutionListByFilterWithExecutionType(category,
-								filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses,
-								executionType, pageable);
-					}
-				}
-
-			}
-			return executions;
-		} catch (Exception e) {
-			LOGGER.error("Error fetching execution details based on custom filter criteria", e);
-			throw new TDKServiceException(e.getMessage());
-		}
-
-	}
+	// The case where the execution type is not provided, is Constants.ALL, or script test suite is not provided
+	if ((Utils.isEmpty(filterRequest.getExecutionType()) || Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType()))
+                && (Utils.isEmpty(filterRequest.getScriptTestSuite()))) {
+            LOGGER.info("Fetching execution list based on category, start date, end date and status (ALL execution types)");
+            executions = executionRepository.getExecutionListByFilter(category, filterRequest.getStartDate(),
+                    filterRequest.getEndDate(), executionStatuses, pageable);
+	} else if (!Utils.isEmpty(filterRequest.getExecutionType()) && !Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType())) {
+            LOGGER.info(
+                    "Fetching execution list based on category, start date, end date, status and execution type");
+            ExecutionType executionType = ExecutionType.valueOf(filterRequest.getExecutionType().toUpperCase());
+            if (executionType == null) {
+                throw new UserInputException("Invalid execution type provided");
+            }
+            // The case where the execution type is provided and script test suite is not provided
+            if (Utils.isEmpty(filterRequest.getScriptTestSuite())) {
+                executions = executionRepository.getExecutionListByFilterWithExecutionType(category,
+                        filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses, executionType,
+                        pageable);
+            } else {
+                // The case where the execution type and script test suite are provided
+                if (executionType == ExecutionType.TESTSUITE || executionType == ExecutionType.SINGLESCRIPT) {
+                    // The case where the execution type is testsuite or singlescript
+                    executions = executionRepository.getExecutionListByFilterWithExecutionTypeAndSuitescript(
+                            category, filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses,
+                            executionType, filterRequest.getScriptTestSuite(), pageable);
+                } else {
+                    // The case where the execution type is Multiscript
+                    executions = executionRepository.getExecutionListByFilterWithExecutionType(category,
+                            filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses,
+                            executionType, pageable);
+                }
+            }
+	} else if (Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType()) && !Utils.isEmpty(filterRequest.getScriptTestSuite())) {
+            // Special case: ALL execution types but with script/test suite filter
+            LOGGER.info("Fetching execution list for ALL execution types with script/test suite filter");
+            executions = executionRepository.getExecutionListByFilter(category, filterRequest.getStartDate(),
+                    filterRequest.getEndDate(), executionStatuses, pageable);
+            // Note: You might need to add additional filtering logic here if you want to filter by script/test suite for ALL types
+        }
+        
+        return executions;
+    } catch (Exception e) {
+        LOGGER.error("Error fetching execution details based on custom filter criteria", e);
+        throw new TDKServiceException(e.getMessage());
+    }
+}
 
 	/**
 	 * Method that checks if any execution result is failed.
