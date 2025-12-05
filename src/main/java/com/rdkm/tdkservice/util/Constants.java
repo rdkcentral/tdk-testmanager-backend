@@ -635,4 +635,7 @@ public class Constants {
 	// Get Image name python file
 	public static final String THUNDER_DISABLED_IMAGE_NAME_SCRIPT = "getimagename_cmndline.py";
 
+	// Constant for the word 'ALL'
+	public static final String ALL = "ALL";
+
 }
