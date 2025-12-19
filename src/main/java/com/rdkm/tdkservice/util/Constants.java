@@ -311,7 +311,7 @@ public class Constants {
 	// config file path
 	public static final String RDK_CERTIFICATION_CONFIG_PATH = "rdkCertificationConfigs";
 	// Header finder to add HEader template
-	public static final String HEADER_FINDER = "If not stated otherwise in this file or this component's LICENSE";
+	public static final String HEADER_FINDER = "If not stated otherwise in this file or this component's Licenses.txt";
 	// Header template
 	public static final String HEADER_TEMPLATE = "##########################################################################\r\n"
 			+ "# If not stated otherwise in this file or this component's Licenses.txt\r\n"
