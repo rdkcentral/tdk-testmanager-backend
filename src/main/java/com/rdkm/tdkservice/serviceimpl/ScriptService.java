@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -52,6 +53,10 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -210,11 +215,11 @@ public class ScriptService implements IScriptService {
 			throw new TDKServiceException("Module not found for the primitive test: " + primitiveTest.getName());
 		}
 		script.setModule(module);
-//TODO: Need to implement later
-//		if (module.getExecutionTime() < script.getExecutionTimeOut()) {
+		// TODO: Need to implement later
+		// if (module.getExecutionTime() < script.getExecutionTimeOut()) {
 //			LOGGER.error("Script execution time out cannot be greater than module execution time");
 //			throw new UserInputException("Script execution time out cannot be greater than module execution time");
-//		}
+		// }
 
 		// Set the category based on the module
 		Category category = this.getCategoryBasedOnModule(module);
@@ -336,11 +341,11 @@ public class ScriptService implements IScriptService {
 			throw new TDKServiceException("Module not found for the primitive test: " + primitiveTest.getName());
 		}
 		script.setModule(module);
-//TODO: Need to implement later
-//		if (module.getExecutionTime() < scriptUpdateDTO.getExecutionTimeOut()) {
+		// TODO: Need to implement later
+		// if (module.getExecutionTime() < scriptUpdateDTO.getExecutionTimeOut()) {
 //			LOGGER.error("Script execution time out cannot be greater than module execution time");
 //			throw new UserInputException("Script execution time out cannot be greater than module execution time");
-//		}
+		// }
 
 		// Set the category based on the module
 		Category category = this.getCategoryBasedOnModule(module);
@@ -940,110 +945,266 @@ public class ScriptService implements IScriptService {
 	}
 
 	/**
-	 * Upload a ZIP file containing a Python script and an XML file with the script
+	 * Upload a ZIP or TAR.GZ file containing a Python script and an XML file with
+	 * the script
 	 * details
 	 * 
-	 * @param file - the ZIP file
-	 * @return true if the ZIP file is uploaded successfully, false otherwise
+	 * @param file - the ZIP or TAR.GZ file
+	 * @return true if the file is uploaded successfully, false otherwise
 	 * @throws IOException
 	 */
-
 	@Override
 	public boolean uploadZipFile(MultipartFile file) throws IOException {
-		LOGGER.info("Uploading zip file: " + file.getOriginalFilename());
+		LOGGER.info("Uploading archive file: " + file.getOriginalFilename());
 
-		// Validate file is a zip
-		if (!file.getContentType().equals("application/zip")
-				&& !file.getOriginalFilename().endsWith(Constants.ZIP_EXTENSION)) {
-			LOGGER.error("Only ZIP files are allowed");
-			throw new UserInputException("Only ZIP files are allowed");
+		String fileName = file.getOriginalFilename();
+		boolean isZipFile = false;
+		boolean isTarGzFile = false;
+
+		// Validate file type
+		if ((file.getContentType() != null && file.getContentType().equals("application/zip"))
+				|| (fileName != null && fileName.endsWith(Constants.ZIP_EXTENSION))) {
+			isZipFile = true;
+		} else if ((file.getContentType() != null &&
+				(file.getContentType().equals("application/gzip") ||
+						file.getContentType().equals("application/x-gzip") ||
+						file.getContentType().equals("application/x-tar") ||
+						file.getContentType().equals("application/x-compressed-tar")))
+				|| (fileName != null &&
+						(fileName.endsWith(".tar.gz") || fileName.endsWith(".tgz")))) {
+			isTarGzFile = true;
+		} else {
+			LOGGER.error("Only ZIP and TAR.GZ files are allowed");
+			throw new UserInputException("Only ZIP and TAR.GZ files are allowed");
 		}
 
-		// Create a temporary file to store the uploaded zip
-		File tempZipFile = File.createTempFile("uploaded-", Constants.ZIP_EXTENSION);
-		file.transferTo(tempZipFile);
+		MultipartFile pythonFile = null;
+		ScriptCreateDTO scriptCreateDTO = null;
+		String scriptId = null;
 
-		try (ZipFile zip = new ZipFile(tempZipFile)) {
-			Enumeration<? extends ZipEntry> entries = zip.entries();
-			boolean pythonFileExists = false;
-			boolean xmlFileExists = false;
-			MultipartFile pythonFile = null;
-			ScriptCreateDTO scriptCreateDTO = null;
+		if (isZipFile) {
+			// Handle ZIP file processing (existing logic)
+			File tempZipFile = File.createTempFile("uploaded-", Constants.ZIP_EXTENSION);
+			file.transferTo(tempZipFile);
 
-			// First pass to check if both Python (.py) and XML (.xml) files exist
-			while (entries.hasMoreElements()) {
-				ZipEntry entry = entries.nextElement();
-				// Check for Python file
-				if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
-					pythonFileExists = true;
+			try (ZipFile zip = new ZipFile(tempZipFile)) {
+				boolean[] fileExists = validateAndExtractFromZip(zip);
+				if (!fileExists[0] || !fileExists[1]) {
+					LOGGER.error("Both Python and XML files are required in the archive file.");
+					throw new UserInputException("Both Python and XML files are required in the archive file.");
 				}
-				// Check for XML file
-				if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
-					xmlFileExists = true;
-				}
-			}
-			// If either Python or XML file is missing, throw a UserInputException
-			if (!pythonFileExists || !xmlFileExists) {
-				LOGGER.error("Both Python and XML files are required in the ZIP file.");
-				throw new UserInputException("Both Python and XML files are required in the ZIP file.");
-			}
 
-			// Reset entries to process the files now that we know both exist
-			entries = zip.entries();
-			String scriptId = null;
-			// Process the Python and XML files
-			while (entries.hasMoreElements()) {
-				ZipEntry entry = entries.nextElement();
-				// Handle Python file
-				if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
-					try (InputStream pyInputStream = zip.getInputStream(entry)) {
-						// Convert Python file to MultipartFile
+				Object[] extractedFiles = extractFilesFromZip(zip);
+				pythonFile = (MultipartFile) extractedFiles[0];
+				scriptCreateDTO = (ScriptCreateDTO) extractedFiles[1];
+				scriptId = (String) extractedFiles[2];
 
-						String[] parts = entry.getName().split("/");
-						String fileName = parts[parts.length - 1];
-						System.out.println("File Name is" + fileName);
-						pythonFile = convertScriptFileToMultipartFile(pyInputStream, fileName);
-
-					}
-				}
-				// Handle XML file
-				else if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
-					try (InputStream xmlInputStream = zip.getInputStream(entry)) {
-						// Convert XML file to ScriptCreateDTO
-						byte[] xmlBytes = xmlInputStream.readAllBytes();
-						scriptId = extractScriptIDFromXml(new ByteArrayInputStream(xmlBytes));
-						scriptCreateDTO = convertXmlToScriptCreateDTO(new ByteArrayInputStream(xmlBytes));
-
-					}
-				}
-			}
-
-			// Validate that both files were processed
-			if (pythonFile != null && scriptCreateDTO != null) {
-
-				String scriptName = scriptCreateDTO.getName();
-				Script script = scriptRepository.findByName(scriptName);
-				boolean saveOrUpdateScript = false;
-				if (script == null) {
-					LOGGER.error("Script going to be save as new: " + scriptName);
-					saveOrUpdateScript = saveNewScript(pythonFile, scriptCreateDTO, scriptId);
-				} else {
-					LOGGER.error("Script going to be updated: " + scriptName);
-					ScriptDTO scriptDTO = MapperUtils.convertToScriptDTOForXMLUpdate(scriptCreateDTO, script);
-					saveOrUpdateScript = updateScriptFromXML(pythonFile, scriptDTO, script);
-				}
-				// boolean savedScript = saveScript(pythonFile, scriptCreateDTO);
-
+			} finally {
 				tempZipFile.delete();
-				LOGGER.info("Script XML saved successfully");
-				return saveOrUpdateScript;
-			} else {
-				LOGGER.error(
-						"Error processing the zip file, either the XML or Python file was not processed correctly.");
-				throw new TDKServiceException("Error processing the zip file: XML or Python file processing failed.");
+			}
+
+		} else if (isTarGzFile) {
+			// Handle TAR.GZ file processing
+			try (InputStream fileInputStream = file.getInputStream();
+					GZIPInputStream gzipInputStream = new GZIPInputStream(fileInputStream);
+					TarArchiveInputStream tarInputStream = new TarArchiveInputStream(gzipInputStream)) {
+
+				boolean[] fileExists = validateAndExtractFromTar(tarInputStream);
+				if (!fileExists[0] || !fileExists[1]) {
+					LOGGER.error("Both Python and XML files are required in the archive file.");
+					throw new UserInputException("Both Python and XML files are required in the archive file.");
+				}
+
+				// Reset stream for actual extraction
+				try (InputStream fileInputStream2 = file.getInputStream();
+						GZIPInputStream gzipInputStream2 = new GZIPInputStream(fileInputStream2);
+						TarArchiveInputStream tarInputStream2 = new TarArchiveInputStream(gzipInputStream2)) {
+
+					Object[] extractedFiles = extractFilesFromTar(tarInputStream2);
+					pythonFile = (MultipartFile) extractedFiles[0];
+					scriptCreateDTO = (ScriptCreateDTO) extractedFiles[1];
+					scriptId = (String) extractedFiles[2];
+				}
 			}
 		}
 
+		// Process the extracted files (common logic for both ZIP and TAR.GZ)
+		if (pythonFile != null && scriptCreateDTO != null) {
+			String scriptName = scriptCreateDTO.getName();
+			Script script = scriptRepository.findByName(scriptName);
+			boolean saveOrUpdateScript = false;
+
+			if (script == null) {
+				LOGGER.info("Script going to be saved as new: " + scriptName);
+				saveOrUpdateScript = saveNewScript(pythonFile, scriptCreateDTO, scriptId);
+			} else {
+				LOGGER.info("Script going to be updated: " + scriptName);
+				ScriptDTO scriptDTO = MapperUtils.convertToScriptDTOForXMLUpdate(scriptCreateDTO, script);
+				saveOrUpdateScript = updateScriptFromXML(pythonFile, scriptDTO, script);
+			}
+
+			LOGGER.info("Script processed successfully");
+			return saveOrUpdateScript;
+		} else {
+			LOGGER.error(
+					"Error processing the archive file, either the XML or Python file was not processed correctly.");
+			throw new TDKServiceException("Error processing the archive file: XML or Python file processing failed.");
+		}
+	}
+
+	/**
+	 * Validates and extracts information from a ZIP file to check for required file
+	 * types.
+	 * 
+	 * This method iterates through all entries in the provided ZIP file and checks
+	 * for the
+	 * presence of Python (.py) and XML files based on their file extensions.
+	 * 
+	 * @param zip the ZipFile to validate and extract information from
+	 * @return a boolean array where the first element indicates if at least one
+	 *         Python file
+	 *         exists in the ZIP, and the second element indicates if at least one
+	 *         XML file
+	 *         exists in the ZIP
+	 */
+	private boolean[] validateAndExtractFromZip(ZipFile zip) {
+		boolean pythonFileExists = false;
+		boolean xmlFileExists = false;
+
+		Enumeration<? extends ZipEntry> entries = zip.entries();
+		while (entries.hasMoreElements()) {
+			ZipEntry entry = entries.nextElement();
+			if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+				pythonFileExists = true;
+			}
+			if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
+				xmlFileExists = true;
+			}
+		}
+
+		return new boolean[] { pythonFileExists, xmlFileExists };
+	}
+
+	/**
+	 * Validates and extracts information from a TAR.GZ file to check for required
+	 * file types.
+	 * 
+	 * This method iterates through all entries in the provided TAR.GZ input stream
+	 * and checks for the
+	 * presence of Python (.py) and XML files based on their file extensions.
+	 * 
+	 * @param tarInputStream the TarArchiveInputStream to validate and extract
+	 *                       information from
+	 * @return a boolean array where the first element indicates if at least one
+	 *         Python file
+	 *         exists in the TAR.GZ, and the second element indicates if at least
+	 *         one XML file
+	 *         exists in the TAR.GZ
+	 * @throws IOException if an I/O error occurs while reading the TAR.GZ input
+	 *                     stream
+	 */
+	private boolean[] validateAndExtractFromTar(TarArchiveInputStream tarInputStream) throws IOException {
+		boolean pythonFileExists = false;
+		boolean xmlFileExists = false;
+
+		TarArchiveEntry entry;
+		while ((entry = tarInputStream.getNextTarEntry()) != null) {
+			if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+				pythonFileExists = true;
+			}
+			if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
+				xmlFileExists = true;
+			}
+		}
+
+		return new boolean[] { pythonFileExists, xmlFileExists };
+	}
+
+	/**
+	 * Extracts the Python and XML files from a ZIP file.
+	 * 
+	 * @param zip the ZipFile to extract files from
+	 * @return an array containing the extracted Python MultipartFile,
+	 *         ScriptCreateDTO, and script ID
+	 * @throws IOException if an I/O error occurs while reading the ZIP file
+	 */
+	private Object[] extractFilesFromZip(ZipFile zip) throws IOException {
+		MultipartFile pythonFile = null;
+		ScriptCreateDTO scriptCreateDTO = null;
+		String scriptId = null;
+
+		Enumeration<? extends ZipEntry> entries = zip.entries();
+		while (entries.hasMoreElements()) {
+			ZipEntry entry = entries.nextElement();
+
+			if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+				try (InputStream pyInputStream = zip.getInputStream(entry)) {
+					String[] parts = entry.getName().split("/");
+					String fileName = parts[parts.length - 1];
+					pythonFile = convertScriptFileToMultipartFile(pyInputStream, fileName);
+				}
+			} else if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
+				try (InputStream xmlInputStream = zip.getInputStream(entry)) {
+					byte[] xmlBytes = xmlInputStream.readAllBytes();
+					scriptId = extractScriptIDFromXml(new ByteArrayInputStream(xmlBytes));
+					scriptCreateDTO = convertXmlToScriptCreateDTO(new ByteArrayInputStream(xmlBytes));
+				}
+			}
+		}
+
+		return new Object[] { pythonFile, scriptCreateDTO, scriptId };
+	}
+
+	/**
+	 * Extracts the Python and XML files from a TAR.GZ input stream.
+	 * 
+	 * @param tarInputStream the TarArchiveInputStream to extract files from
+	 * @return an array containing the extracted Python MultipartFile,
+	 *         ScriptCreateDTO, and script ID
+	 * @throws IOException if an I/O error occurs while reading the TAR.GZ input
+	 *                     stream
+	 */
+	private Object[] extractFilesFromTar(TarArchiveInputStream tarInputStream) throws IOException {
+		MultipartFile pythonFile = null;
+		ScriptCreateDTO scriptCreateDTO = null;
+		String scriptId = null;
+
+		TarArchiveEntry entry;
+		while ((entry = tarInputStream.getNextTarEntry()) != null) {
+			if (entry.isFile()) {
+				if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+					String[] parts = entry.getName().split("/");
+					String fileName = parts[parts.length - 1];
+
+					// Read all bytes from the tar entry properly
+					ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+					byte[] buffer = new byte[8192];
+					int bytesRead;
+					while ((bytesRead = tarInputStream.read(buffer)) != -1) {
+						outputStream.write(buffer, 0, bytesRead);
+					}
+					byte[] fileContent = outputStream.toByteArray();
+
+					pythonFile = convertScriptFileToMultipartFile(
+							new ByteArrayInputStream(fileContent), fileName);
+
+				} else if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
+					// Read all bytes from the tar entry properly
+					ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+					byte[] buffer = new byte[8192];
+					int bytesRead;
+					while ((bytesRead = tarInputStream.read(buffer)) != -1) {
+						outputStream.write(buffer, 0, bytesRead);
+					}
+					byte[] xmlBytes = outputStream.toByteArray();
+
+					scriptId = extractScriptIDFromXml(new ByteArrayInputStream(xmlBytes));
+					scriptCreateDTO = convertXmlToScriptCreateDTO(new ByteArrayInputStream(xmlBytes));
+				}
+			}
+		}
+
+		return new Object[] { pythonFile, scriptCreateDTO, scriptId };
 	}
 
 	/**
@@ -1650,6 +1811,53 @@ public class ScriptService implements IScriptService {
 			throw new TDKServiceException("Error generating markdown ZIP by category: " + e.getMessage());
 		}
 		return new ByteArrayInputStream(baos.toByteArray());
+	}
+
+	/**
+	 * Generate a tar.gz file containing a Python script and an XML file with the
+	 * test
+	 * case details
+	 * 
+	 * @param scriptName - the script name
+	 * @return - the tar.gz file as a byte array
+	 */
+	@Override
+	public byte[] generateScriptTarGz(String scriptName) {
+		String xmlContent;
+		File getPythonScriptFile;
+		xmlContent = generateTestCaseXml(scriptName);
+		getPythonScriptFile = getPythonFile(scriptName);
+
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+		try (GzipCompressorOutputStream gzipOut = new GzipCompressorOutputStream(byteArrayOutputStream);
+				TarArchiveOutputStream tarOutputStream = new TarArchiveOutputStream(gzipOut)) {
+
+			// Add XML file to tar
+			byte[] xmlBytes = xmlContent.getBytes(StandardCharsets.UTF_8);
+			TarArchiveEntry xmlEntry = new TarArchiveEntry(scriptName + Constants.XML_FILE_EXTENSION);
+			xmlEntry.setSize(xmlBytes.length);
+			tarOutputStream.putArchiveEntry(xmlEntry);
+			tarOutputStream.write(xmlBytes);
+			tarOutputStream.closeArchiveEntry();
+
+			// Add Python script file to tar
+			byte[] scriptBytes = Files.readAllBytes(getPythonScriptFile.toPath());
+			TarArchiveEntry scriptEntry = new TarArchiveEntry(getPythonScriptFile.getName());
+			scriptEntry.setSize(scriptBytes.length);
+			tarOutputStream.putArchiveEntry(scriptEntry);
+			tarOutputStream.write(scriptBytes);
+			tarOutputStream.closeArchiveEntry();
+
+			tarOutputStream.finish();
+		} catch (FileNotFoundException e) {
+			LOGGER.error("File not found: " + e.getMessage());
+			throw new TDKServiceException("File not found: " + e.getMessage());
+		} catch (IOException e) {
+			LOGGER.error("IO error: " + e.getMessage());
+			throw new TDKServiceException("IO error: " + e.getMessage());
+		}
+
+		return byteArrayOutputStream.toByteArray();
 	}
 
 }
