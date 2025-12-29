@@ -24,6 +24,7 @@ import java.time.Instant;
 import com.rdkm.tdkservice.enums.ExecutionResultStatus;
 import com.rdkm.tdkservice.enums.ExecutionStatus;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -79,7 +80,8 @@ public class ExecutionResult extends BaseEntity {
 	/**
 	 * For storing the remarks of the execution,or reason other than the logs
 	 */
-	String executionRemarks;
+	@Column(length=2000) 
+	String  executionRemarks;
 
 	/**
 	 * The execution entity reference

@@ -849,20 +849,25 @@ public class ExecutionAsyncService {
 				if (output.contains(Constants.END_TAG_PY_COMMENT)) {
 					// The execution result is parallely set from the python framework via APIS
 					// that is added here
+					LOGGER.info("Execution  of the python script ended abruptly with script end tag");
 					ExecutionResult finalExecutionResult = executionResultRepository.findById(executionResult.getId())
 							.get();
 					finalExecutionResultStatus = finalExecutionResult.getResult();
 
 					// When the result status was not parallely set from the
-					// python framework but the execution was completed, due to someissue
+					// python framework but the execution was completed, due to some issue
 					// in the python framework. In that case the result status is not set to SUCCESS
 					// FAILURE ,In that case, the result status is set to FAILURE
 					if (finalExecutionResultStatus == ExecutionResultStatus.INPROGRESS) {
 						finalExecutionResultStatus = ExecutionResultStatus.FAILURE;
+						LOGGER.info(
+								"The script execution completed,but the result status was not set from the python framework or script, setting the result status to FAILURE");
 						executionResult.setExecutionRemarks(remarksString
-								+ "Script execution completed with status FAILURE, because the script execution got finished.But no status was set from the python framework or script"
-								+ finalExecutionResultStatus);
+								+ "The script execution completed,but the result status was not set from the python framework or script, most likely due to some issue in the script"
+								);
 					}
+					//Not removing the END_TAG_PY_COMMENT from the script logs here purposefully for easier
+					//debugging, with that we get to know that the execution got completed abruptly
 					executionResult.setResult(finalExecutionResultStatus);
 					executionResultRepository.save(executionResult);
 
