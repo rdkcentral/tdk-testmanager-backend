@@ -217,8 +217,10 @@ public class ScriptService implements IScriptService {
 		script.setModule(module);
 		// TODO: Need to implement later
 		// if (module.getExecutionTime() < script.getExecutionTimeOut()) {
-//			LOGGER.error("Script execution time out cannot be greater than module execution time");
-//			throw new UserInputException("Script execution time out cannot be greater than module execution time");
+		// LOGGER.error("Script execution time out cannot be greater than module
+		// execution time");
+		// throw new UserInputException("Script execution time out cannot be greater
+		// than module execution time");
 		// }
 
 		// Set the category based on the module
@@ -343,8 +345,10 @@ public class ScriptService implements IScriptService {
 		script.setModule(module);
 		// TODO: Need to implement later
 		// if (module.getExecutionTime() < scriptUpdateDTO.getExecutionTimeOut()) {
-//			LOGGER.error("Script execution time out cannot be greater than module execution time");
-//			throw new UserInputException("Script execution time out cannot be greater than module execution time");
+		// LOGGER.error("Script execution time out cannot be greater than module
+		// execution time");
+		// throw new UserInputException("Script execution time out cannot be greater
+		// than module execution time");
 		// }
 
 		// Set the category based on the module
@@ -983,7 +987,7 @@ public class ScriptService implements IScriptService {
 		String scriptId = null;
 
 		if (isZipFile) {
-			// Handle ZIP file processing (existing logic)
+			// Handle ZIP file processing
 			File tempZipFile = File.createTempFile("uploaded-", Constants.ZIP_EXTENSION);
 			file.transferTo(tempZipFile);
 
