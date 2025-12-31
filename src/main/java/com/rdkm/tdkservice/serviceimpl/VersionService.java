@@ -82,7 +82,8 @@ public class VersionService implements IVersionService {
      */
     public String getTdkBroadbandVersion() {
         LOGGER.info("Getting TDK Broadband version from testscriptsRDKB/version.json file");
-        return getVersionFromJsonFile("testscriptsRDKB" + File.separator + "version.json", "TDK Broadband");
+        return getVersionFromJsonFile(
+                "testscriptsRDKB" + File.separator + "component" + File.separator + "version.json", "TDK Broadband");
     }
 
     /**

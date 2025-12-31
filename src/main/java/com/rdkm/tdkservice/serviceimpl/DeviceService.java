@@ -305,10 +305,16 @@ public class DeviceService implements IDeviceService {
 			throw new UserInputException("Device is in use, you can't delete");
 		}
 		try {
-			// Delete config file first
+			// Delete config file first (if it exists)
 			String configFileName = deviceConfigService.getDeviceConfigFileName(device.getName(),
 					device.getDeviceType().getName(), device.isThunderEnabled());
-			deviceConfigService.deleteDeviceConfigFile(configFileName, device.isThunderEnabled());
+			try {
+				deviceConfigService.deleteDeviceConfigFile(configFileName, device.isThunderEnabled());
+			} catch (UserInputException e) {
+				// Config file doesn't exist, which is fine - log and continue
+				LOGGER.info("No device config file found for device: {} - continuing with device deletion",
+						device.getName());
+			}
 			// Then, delete the device
 			deviceRepository.deleteById(id);
 			return true;
