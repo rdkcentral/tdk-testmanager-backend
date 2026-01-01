@@ -1698,10 +1698,10 @@ public class ExecutionService implements IExecutionService {
 			executionTriggerDTO.setCategory(execution.getCategory().name());
 			executionTriggerDTO.setExecutionName(execName);
 			executionTriggerDTO.setRepeatCount(1);
-			executionTriggerDTO.setRerunOnFailure(false);
-			executionTriggerDTO.setDeviceLogsNeeded(true);
-			executionTriggerDTO.setDiagnosticLogsNeeded(true);
-			executionTriggerDTO.setPerformanceLogsNeeded(true);
+			executionTriggerDTO.setRerunOnFailure(execution.isRerunOnFailure());
+			executionTriggerDTO.setDeviceLogsNeeded(execution.isDeviceLogsNeeded());
+			executionTriggerDTO.setDiagnosticLogsNeeded(execution.isDiagnosticLogsNeeded());
+			executionTriggerDTO.setPerformanceLogsNeeded(execution.isPerformanceLogsNeeded());
 			this.startExecution(executionTriggerDTO);
 			LOGGER.info("Successfully repeated execution with id: {}", execId);
 		} catch (Exception e) {
