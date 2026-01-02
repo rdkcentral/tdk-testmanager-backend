@@ -567,11 +567,27 @@ public class TestSuiteService implements ITestSuiteService {
 	public boolean uploadTestSuiteAsXML(MultipartFile testSuiteXMLFile) {
 		// Validate the uploaded file
 		validateFile(testSuiteXMLFile);
+		String testSuiteName = testSuiteXMLFile.getOriginalFilename().replace(Constants.XML_EXTENSION,
+				Constants.EMPTY_STRING);
 		try {
-
-			String testSuiteName = testSuiteXMLFile.getOriginalFilename().replace(Constants.XML_EXTENSION,
-					Constants.EMPTY_STRING);
 			InputStream xmlInputStream = testSuiteXMLFile.getInputStream();
+			return uploadTestSuiteXml(xmlInputStream, testSuiteName);
+		} catch (Exception e) {
+			LOGGER.error("Error while uploading test suite from XML file", e);
+			throw new TDKServiceException("Error while uploading test suite from XML file");
+		}
+	}
+
+	/**
+	 * This method is used to upload the test suite from XML input stream
+	 * 
+	 * @param xmlInputStream - the XML input stream
+	 * @param testSuiteName  - the test suite name
+	 * @return - true if the test suite is uploaded successfully, false otherwise
+	 */
+	public boolean uploadTestSuiteXml(InputStream xmlInputStream, String testSuiteName) {
+		LOGGER.info("Uploading test suite from XML for the test suite: " + testSuiteName);
+		try {
 			// Parse XML
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 			DocumentBuilder builder = factory.newDocumentBuilder();
@@ -892,51 +908,7 @@ public class TestSuiteService implements ITestSuiteService {
 	public ByteArrayInputStream downloadCustomTestSuiteAsXML(String category) {
 		LOGGER.info("Downloading custom (non-module) test suites as XML for the category: " + category);
 
-		// Validate category
-		Category categoryObj = commonService.validateCategory(category);
-
-		// Get all test suites for the category
-		List<TestSuite> testSuiteList;
-		if (Category.RDKV.equals(categoryObj)) {
-			testSuiteList = testSuiteRepository
-					.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
-		} else {
-			testSuiteList = testSuiteRepository.findAllByCategory(categoryObj);
-		}
-
-		if (testSuiteList == null || testSuiteList.isEmpty()) {
-			LOGGER.error("No test suites found for the category: " + category);
-			throw new ResourceNotFoundException("Custom test suite for category ", category);
-		}
-
-		// Get all module names for the category
-		List<Module> modules;
-		if (Category.RDKV.equals(categoryObj)) {
-			modules = moduleRepository.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
-		} else {
-			modules = moduleRepository.findAllByCategory(categoryObj);
-		}
-
-		// Create a set of module names for faster lookup
-		Set<String> moduleNames = modules.stream()
-				.map(Module::getName)
-				.collect(Collectors.toSet());
-
-		LOGGER.info("Found {} modules for category {}", moduleNames.size(), category);
-
-		// Filter test suites to exclude those whose names match module names
-		List<TestSuite> customTestSuites = testSuiteList.stream()
-				.filter(testSuite -> !moduleNames.contains(testSuite.getName()))
-				.collect(Collectors.toList());
-
-		if (customTestSuites.isEmpty()) {
-			LOGGER.error("No custom test suites found for the category: " + category);
-			throw new ResourceNotFoundException("Custom Test Suites for", category);
-		}
-
-		LOGGER.info("Found {} custom test suites (out of {} total) for category {}",
-				customTestSuites.size(), testSuiteList.size(), category);
-
+		List<TestSuite> customTestSuites = this.getCustomTestSuitesByCategory(category);
 		// Create ZIP file with custom test suites
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ZipOutputStream zipOut = new ZipOutputStream(out);
@@ -978,51 +950,7 @@ public class TestSuiteService implements ITestSuiteService {
 	public ByteArrayInputStream downloadCustomTestSuiteAsTarGz(String category) {
 		LOGGER.info("Downloading custom (non-module) test suites as TAR.GZ for the category: " + category);
 
-		// Validate category
-		Category categoryObj = commonService.validateCategory(category);
-
-		// Get all test suites for the category
-		List<TestSuite> testSuiteList;
-		if (Category.RDKV.equals(categoryObj)) {
-			testSuiteList = testSuiteRepository
-					.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
-		} else {
-			testSuiteList = testSuiteRepository.findAllByCategory(categoryObj);
-		}
-
-		if (testSuiteList == null || testSuiteList.isEmpty()) {
-			LOGGER.error("No test suites found for the category: " + category);
-			throw new ResourceNotFoundException("Custom test suite for category ", category);
-		}
-
-		// Get all module names for the category
-		List<Module> modules;
-		if (Category.RDKV.equals(categoryObj)) {
-			modules = moduleRepository.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
-		} else {
-			modules = moduleRepository.findAllByCategory(categoryObj);
-		}
-
-		// Create a set of module names for faster lookup
-		Set<String> moduleNames = modules.stream()
-				.map(Module::getName)
-				.collect(Collectors.toSet());
-
-		LOGGER.info("Found {} modules for category {}", moduleNames.size(), category);
-
-		// Filter test suites to exclude those whose names match module names
-		List<TestSuite> customTestSuites = testSuiteList.stream()
-				.filter(testSuite -> !moduleNames.contains(testSuite.getName()))
-				.collect(Collectors.toList());
-
-		if (customTestSuites.isEmpty()) {
-			LOGGER.error("No custom test suites found for the category: " + category);
-			throw new ResourceNotFoundException("Custom Test Suites for", category);
-		}
-
-		LOGGER.info("Found {} custom test suites (out of {} total) for category {}",
-				customTestSuites.size(), testSuiteList.size(), category);
-
+		List<TestSuite> customTestSuites = this.getCustomTestSuitesByCategory(category);
 		// Create TAR.GZ file with custom test suites
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -1067,6 +995,61 @@ public class TestSuiteService implements ITestSuiteService {
 	}
 
 	/**
+	 * This method is used to get the list of custom/non-module test suites
+	 * (test suites whose names don't match any module name)
+	 * 
+	 * @param category - the category
+	 * @return the list of custom test suites
+	 */
+	public List<TestSuite> getCustomTestSuitesByCategory(String category) {
+		LOGGER.info("Fetching custom (non-module) test suites for the category: " + category);
+		Category categoryObj = commonService.validateCategory(category);
+
+		// Get all test suites for the category
+		List<TestSuite> testSuiteList;
+		if (Category.RDKV.equals(categoryObj)) {
+			testSuiteList = testSuiteRepository
+					.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
+		} else {
+			testSuiteList = testSuiteRepository.findAllByCategory(categoryObj);
+		}
+
+		if (testSuiteList == null || testSuiteList.isEmpty()) {
+			LOGGER.error("No test suites found for the category: " + category);
+			throw new ResourceNotFoundException("Custom test suite for category ", category);
+		}
+
+		// Get all module names for the category
+		List<Module> modules;
+		if (Category.RDKV.equals(categoryObj)) {
+			modules = moduleRepository.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
+		} else {
+			modules = moduleRepository.findAllByCategory(categoryObj);
+		}
+
+		// Create a set of module names for faster lookup
+		Set<String> moduleNames = modules.stream()
+				.map(Module::getName)
+				.collect(Collectors.toSet());
+
+		LOGGER.info("Found {} modules for category {}", moduleNames.size(), category);
+
+		// Filter test suites to exclude those whose names match module names
+		List<TestSuite> customTestSuites = testSuiteList.stream()
+				.filter(testSuite -> !moduleNames.contains(testSuite.getName()))
+				.collect(Collectors.toList());
+
+		if (customTestSuites.isEmpty()) {
+			LOGGER.error("No custom test suites found for the category: " + category);
+			throw new ResourceNotFoundException("Custom Test Suites for", category);
+		}
+
+		LOGGER.info("Found {} custom test suites (out of {} total) for category {}",
+				customTestSuites.size(), testSuiteList.size(), category);
+		return customTestSuites;
+	}
+
+	/**
 	 * This method is used to upload multiple test suites from an archive file (ZIP
 	 * or TAR.GZ)
 	 * 
@@ -1086,17 +1069,15 @@ public class TestSuiteService implements ITestSuiteService {
 		int failureCount = 0;
 
 		try {
-			InputStream inputStream = archiveFile.getInputStream();
-
 			// Determine file type and process accordingly
 			if (fileName.endsWith(".zip")) {
 				LOGGER.info("Processing ZIP archive");
-				Map<String, Integer> result = processZipArchive(inputStream);
+				Map<String, Integer> result = processZipArchive(archiveFile);
 				successCount = result.get("success");
 				failureCount = result.get("failure");
 			} else if (fileName.endsWith(".tar.gz") || fileName.endsWith(".tgz")) {
 				LOGGER.info("Processing TAR.GZ archive");
-				Map<String, Integer> result = processTarGzArchive(inputStream);
+				Map<String, Integer> result = processTarGzArchive(archiveFile);
 				successCount = result.get("success");
 				failureCount = result.get("failure");
 			} else {
@@ -1123,10 +1104,10 @@ public class TestSuiteService implements ITestSuiteService {
 	 * @return Map with success, failure, and skipped counts
 	 * @throws Exception
 	 */
-	private Map<String, Integer> processZipArchive(InputStream inputStream) throws Exception {
+	private Map<String, Integer> processZipArchive(MultipartFile archiveFile) throws Exception {
 		int successCount = 0;
 		int failureCount = 0;
-
+		InputStream inputStream = archiveFile.getInputStream();
 		try (ZipInputStream zipIn = new ZipInputStream(inputStream)) {
 			ZipEntry entry;
 
@@ -1145,7 +1126,8 @@ public class TestSuiteService implements ITestSuiteService {
 
 						// Process the test suite XML
 						String testSuiteName = extractTestSuiteNameFromFileName(entry.getName());
-						boolean result = processTestSuiteXML(out.toByteArray(), testSuiteName);
+						ByteArrayInputStream xmlInputStream = new ByteArrayInputStream(out.toByteArray());
+						boolean result = uploadTestSuiteXml(xmlInputStream, testSuiteName);
 
 						if (result) {
 							successCount++;
@@ -1176,10 +1158,10 @@ public class TestSuiteService implements ITestSuiteService {
 	 * @return Map with success, failure, and skipped counts
 	 * @throws Exception
 	 */
-	private Map<String, Integer> processTarGzArchive(InputStream inputStream) throws Exception {
+	private Map<String, Integer> processTarGzArchive(MultipartFile archiveFile) throws Exception {
 		int successCount = 0;
 		int failureCount = 0;
-
+		InputStream inputStream = archiveFile.getInputStream();
 		try (GZIPInputStream gzipIn = new GZIPInputStream(inputStream);
 				TarArchiveInputStream tarIn = new TarArchiveInputStream(gzipIn)) {
 
@@ -1200,7 +1182,8 @@ public class TestSuiteService implements ITestSuiteService {
 
 						// Process the test suite XML
 						String testSuiteName = extractTestSuiteNameFromFileName(entry.getName());
-						boolean result = processTestSuiteXML(out.toByteArray(), testSuiteName);
+						ByteArrayInputStream xmlInputStream = new ByteArrayInputStream(out.toByteArray());
+						boolean result = uploadTestSuiteXml(xmlInputStream, testSuiteName);
 
 						if (result) {
 							successCount++;
@@ -1221,98 +1204,6 @@ public class TestSuiteService implements ITestSuiteService {
 		result.put("failure", failureCount);
 
 		return result;
-	}
-
-	/**
-	 * Process individual test suite XML content
-	 * 
-	 * @param xmlContent    - the XML content as byte array
-	 * @param testSuiteName - the test suite name
-	 * @return boolean - true if successful, false otherwise
-	 * @throws Exception
-	 */
-	private boolean processTestSuiteXML(byte[] xmlContent, String testSuiteName) throws Exception {
-		try {
-			ByteArrayInputStream xmlInputStream = new ByteArrayInputStream(xmlContent);
-
-			// Parse XML
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder builder = factory.newDocumentBuilder();
-			Document document = builder.parse(xmlInputStream);
-
-			// Normalize XML structure
-			document.getDocumentElement().normalize();
-
-			// Extract category
-			NodeList categoryList = document.getElementsByTagName("category");
-			if (categoryList.getLength() == 0) {
-				LOGGER.warn("No category found in test suite: {}", testSuiteName);
-				return false;
-			}
-			String category = categoryList.item(0).getTextContent();
-
-			// Extract description
-			String desc;
-			NodeList description = document.getElementsByTagName("description");
-			if (null != description && description.getLength() > 0) {
-				desc = description.item(0).getTextContent();
-			} else {
-				desc = "Test suite for " + testSuiteName;
-			}
-
-			List<ScriptListDTO> scriptListDTO = new ArrayList<>();
-
-			// Extract scripts
-			NodeList scriptNodes = document.getElementsByTagName("script_name");
-			for (int i = 0; i < scriptNodes.getLength(); i++) {
-				String scriptName = scriptNodes.item(i).getTextContent();
-
-				// Check if script already exists in the database
-				Script existingScript = scriptRepository.findByName(scriptName);
-				if (existingScript != null) {
-					ScriptListDTO scriptDTO = MapperUtils.convertToScriptListDTO(existingScript);
-					scriptListDTO.add(scriptDTO);
-				} else {
-					LOGGER.warn("Script not found in database: {}. Skipping for test suite: {}",
-							scriptName, testSuiteName);
-				}
-			}
-
-			if (scriptListDTO.isEmpty()) {
-				LOGGER.warn("No valid scripts found for test suite: {}", testSuiteName);
-				return false;
-			}
-
-			// Check if test suite already exists
-			TestSuite testSuite = testSuiteRepository.findByName(testSuiteName);
-
-			if (testSuite == null) {
-				// Create new test suite
-				TestSuiteCreateDTO testSuiteCreateDTO = new TestSuiteCreateDTO();
-				testSuiteCreateDTO.setName(testSuiteName);
-				testSuiteCreateDTO.setDescription(desc);
-				testSuiteCreateDTO.setCategory(category);
-				testSuiteCreateDTO.setScripts(scriptListDTO);
-				this.createTestSuite(testSuiteCreateDTO);
-				LOGGER.info("Created new test suite: {}", testSuiteName);
-			} else {
-				// Update existing test suite
-				TestSuiteDTO testSuiteDTO = new TestSuiteDTO();
-				testSuiteDTO.setId(testSuite.getId());
-				testSuiteDTO.setName(testSuiteName);
-				testSuiteDTO.setDescription(desc);
-				testSuiteDTO.setCategory(category);
-				testSuiteDTO.setScripts(scriptListDTO);
-				this.updateTheGivenTestSuite(testSuiteDTO, testSuite);
-				LOGGER.info("Updated existing test suite: {}", testSuiteName);
-			}
-
-			return true;
-
-		} catch (Exception e) {
-			LOGGER.error("Error processing test suite XML for: {}", testSuiteName, e);
-			throw e;
-		}
 	}
 
 	/**
