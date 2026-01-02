@@ -142,4 +142,31 @@ public interface ITestSuiteService {
 	 */
 	List<TestSuiteDetailsResponse> getTestSuiteList();
 
+	/**
+	 * This method is used to download custom/non-module test suites as XML
+	 * (test suites whose names don't match any module name)
+	 * 
+	 * @param category - the category
+	 * @return the custom test suites as XML in a zip file
+	 */
+	ByteArrayInputStream downloadCustomTestSuiteAsXML(String category);
+
+	/**
+	 * Download custom test suites as TAR.GZ
+	 * 
+	 * @param category - the category
+	 * @return ByteArrayInputStream - the tar.gz archive
+	 */
+	ByteArrayInputStream downloadCustomTestSuiteAsTarGz(String category);
+
+	/**
+	 * This method is used to upload multiple test suites from an archive file (ZIP
+	 * or TAR.GZ)
+	 * 
+	 * @param archiveFile - the archive file containing multiple test suite XML
+	 *                    files
+	 * @return String - Summary message of the upload operation
+	 */
+	String uploadAllTestSuitesFromArchive(MultipartFile archiveFile);
+
 }
