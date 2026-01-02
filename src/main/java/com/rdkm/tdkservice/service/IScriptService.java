@@ -133,6 +133,16 @@ public interface IScriptService {
 	byte[] generateScriptZip(String scriptName);
 
 	/**
+	 * Generates a compressed tar.gz archive containing the specified script and its
+	 * dependencies.
+	 * 
+	 * @param scriptName the name of the script to be packaged into the tar.gz
+	 *                   archive
+	 * @return a byte array representing the compressed tar.gz file content
+	 */
+	byte[] generateScriptTarGz(String scriptName);
+
+	/**
 	 * This method is used to get the script template details by primitiveTestName.
 	 *
 	 * @param primitiveTestName - the primitive test name
