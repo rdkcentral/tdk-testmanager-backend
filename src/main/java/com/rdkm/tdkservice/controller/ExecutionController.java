@@ -565,6 +565,7 @@ public class ExecutionController {
 	 * Deletes the execution with the specified ID.
 	 *
 	 * @param id the UUID of the execution to be deleted
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
 	 * @return a ResponseEntity containing a success Response with HTTP status 200
 	 *         if the execution is deleted, or an error Response with HTTP status
 	 *         404 if the execution is not found
@@ -573,9 +574,9 @@ public class ExecutionController {
 	@ApiResponse(responseCode = "201", description = "Execution deleted successfully")
 	@ApiResponse(responseCode = "404", description = "Execution not found")
 	@DeleteMapping("/delete")
-	public ResponseEntity<Response> deleteExecution(@RequestParam UUID id) {
+	public ResponseEntity<Response> deleteExecution(@RequestParam UUID id, @RequestParam boolean isDataDeletionNeeded) {
 		LOGGER.info("Deleting execution by ID: {}", id);
-		boolean isDeleted = executionService.deleteExecution(id);
+		boolean isDeleted = executionService.deleteExecution(id, isDataDeletionNeeded);
 		if (isDeleted) {
 			LOGGER.info("Execution deleted successfully: {}", id);
 			return ResponseUtils.getSuccessResponse("Execution deleted successfully");
@@ -590,6 +591,7 @@ public class ExecutionController {
 	 *
 	 * @param ids the list of UUIDs representing the IDs of the executions to be
 	 *            deleted
+	 * @param isDataDeletionNeeded -  flag indicating whether associated data should also be deleted along with log files
 	 * @return a ResponseEntity containing a success Response with HTTP status 201
 	 *         if the executions are deleted successfully, or an error Response with
 	 *         HTTP status 404 if the executions are not found
@@ -599,9 +601,9 @@ public class ExecutionController {
 	@ApiResponse(responseCode = "201", description = "Executions deleted successfully")
 	@ApiResponse(responseCode = "404", description = "Executions not found")
 	@PostMapping("/deleteListOfExecutions")
-	public ResponseEntity<Response> deleteExecutions(@RequestBody List<UUID> ids) {
+	public ResponseEntity<Response> deleteExecutions(@RequestBody List<UUID> ids, @RequestParam boolean isDataDeletionNeeded) {
 		LOGGER.info("Deleting executions by IDs: {}", ids);
-		boolean isDeleted = executionService.deleteExecutions(ids);
+		boolean isDeleted = executionService.deleteExecutions(ids, isDataDeletionNeeded);
 		if (isDeleted) {
 			LOGGER.info("Executions deleted successfully: {}", ids);
 			return ResponseUtils.getSuccessResponse("Executions deleted successfully");
@@ -616,6 +618,7 @@ public class ExecutionController {
 	 *
 	 * @param fromDate the start date of the range
 	 * @param toDate   the end date of the range
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
 	 * @return a ResponseEntity containing a message indicating the number of
 	 *         executions deleted
 	 *
@@ -625,8 +628,8 @@ public class ExecutionController {
 	@ApiResponse(responseCode = "500", description = "Failed to delete executions")
 	@DeleteMapping("/deleteByDateRange")
 	public ResponseEntity<Response> deleteExecutionsByDateRange(@RequestParam Instant fromDate,
-			@RequestParam Instant toDate) {
-		int deletedCount = executionService.deleteExecutionsByDateRange(fromDate, toDate);
+			@RequestParam Instant toDate, @RequestParam boolean isDataDeletionNeeded) {
+		int deletedCount = executionService.deleteExecutionsByDateRange(fromDate, toDate, isDataDeletionNeeded);
 		LOGGER.info("Deleted {} executions successfully.", deletedCount);
 		if (deletedCount == 0) {
 			LOGGER.error("No executions found in the specified date range.");
