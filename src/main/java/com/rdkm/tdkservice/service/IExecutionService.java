@@ -171,17 +171,19 @@ public interface IExecutionService {
 	 * Deletes an execution identified by the given UUID.
 	 *
 	 * @param id the UUID of the execution to be deleted
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
 	 * @return true if the execution was successfully deleted, false otherwise
 	 */
-	boolean deleteExecution(UUID id);
+	boolean deleteExecution(UUID id, boolean isDataDeletionNeeded);
 
 	/**
 	 * Deletes the executions with the specified IDs.
 	 *
 	 * @param ids the list of UUIDs representing the executions to be deleted
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
 	 * @return true if the executions were successfully deleted, false otherwise
 	 */
-	boolean deleteExecutions(List<UUID> ids);
+	boolean deleteExecutions(List<UUID> ids, boolean isDataDeletionNeeded);
 
 	/**
 	 * Retrieves a paginated list of executions filtered by device name and category
@@ -263,9 +265,10 @@ public interface IExecutionService {
 	 *
 	 * @param fromDate the start date of the range (inclusive)
 	 * @param toDate   the end date of the range (inclusive)
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
 	 * @return the number of executions deleted
 	 */
-	int deleteExecutionsByDateRange(Instant fromDate, Instant toDate);
+	int deleteExecutionsByDateRange(Instant fromDate, Instant toDate, boolean isDataDeletionNeeded);
 
 	/**
 	 * Downloads the script associated with the given execution resource ID.
