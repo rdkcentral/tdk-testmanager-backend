@@ -282,6 +282,11 @@ public class ScriptService implements IScriptService {
 		Script script = scriptRepository.findById(scriptUpdateDTO.getId()).orElseThrow(
 				() -> new ResourceNotFoundException(Constants.SCRIPT_ID, scriptUpdateDTO.getId().toString()));
 
+		boolean hasEntityChanges = checkIfEntityChangesExist(scriptUpdateDTO, script);
+		if (!hasEntityChanges) {
+			this.updateScriptFileOnly(scriptFile, scriptUpdateDTO, script);
+			return true;
+		}
 		// Check if the script name is being updated and if it already exists in the
 		// database
 		if (!Utils.isEmpty(scriptUpdateDTO.getName())) {
@@ -435,6 +440,55 @@ public class ScriptService implements IScriptService {
 			preCondition.setScript(script);
 			script.getPreConditions().add(preCondition);
 		}
+	}
+
+	/**
+	 * Checks if any entity changes exist between the DTO and existing script. This
+	 * is a helper method that returns boolean instead of throwing exception.
+	 * 
+	 * @param scriptUpdateDTO - the script update DTO with new values
+	 * @param existingScript  - the existing script entity from database
+	 * @return true if any entity changes are detected, false otherwise
+	 */
+	private boolean checkIfEntityChangesExist(ScriptDTO scriptUpdateDTO, Script existingScript) {
+		return hasNameChanged(scriptUpdateDTO, existingScript)
+				|| hasPrimitiveTestChanged(scriptUpdateDTO, existingScript)
+				|| hasSynopsisChanged(scriptUpdateDTO, existingScript)
+				|| hasExecutionTimeoutChanged(scriptUpdateDTO, existingScript)
+				|| hasLongDurationChanged(scriptUpdateDTO, existingScript)
+				|| hasSkipExecutionChanged(scriptUpdateDTO, existingScript)
+				|| hasTestIdChanged(scriptUpdateDTO, existingScript)
+				|| hasObjectiveChanged(scriptUpdateDTO, existingScript)
+				|| hasPriorityChanged(scriptUpdateDTO, existingScript)
+				|| hasReleaseVersionChanged(scriptUpdateDTO, existingScript)
+				|| hasDeviceTypesChanged(scriptUpdateDTO, existingScript)
+				|| hasPreConditionsChanged(scriptUpdateDTO, existingScript)
+				|| hasTestStepsChanged(scriptUpdateDTO, existingScript);
+	}
+
+	/**
+	 * Updates only the script file for an existing script without modifying other
+	 * script properties.
+	 * This method handles the validation and replacement of the script file if a
+	 * new file is provided.
+	 *
+	 * @param scriptFile      the new script file to upload; if empty, no update is
+	 *                        performed
+	 * @param scriptUpdateDTO the DTO containing script update information
+	 *                        (currently unused in this method)
+	 * @param script          the existing script entity containing name and
+	 *                        location information for validation
+	 * @throws RuntimeException if script file validation fails
+	 * @throws IOException      if file saving operation fails
+	 */
+	private void updateScriptFileOnly(MultipartFile scriptFile, ScriptDTO scriptUpdateDTO, Script script) {
+		// If the script file is updated, validate and save the new script file
+		if (!scriptFile.isEmpty()) {
+			this.validateScriptFile(scriptFile, script.getName(), script.getScriptLocation());
+			// This will replave the existing file with the new file
+			this.saveScriptFile(scriptFile, script.getScriptLocation());
+		}
+
 	}
 
 	/**
@@ -1862,6 +1916,232 @@ public class ScriptService implements IScriptService {
 		}
 
 		return byteArrayOutputStream.toByteArray();
+	}
+
+	/**
+	 * Checks if the name of a script has been changed by comparing the DTO name
+	 * with the existing script name.
+	 * 
+	 * @param dto      the ScriptDTO containing the potentially new name
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the DTO contains a non-null name that differs from the
+	 *         existing script's name, false otherwise
+	 */
+	private boolean hasNameChanged(ScriptDTO dto, Script existing) {
+		return dto.getName() != null && !dto.getName().equals(existing.getName());
+	}
+
+	/**
+	 * Checks if the primitive test name has changed between the DTO and existing
+	 * script.
+	 * 
+	 * @param dto      the ScriptDTO containing the new primitive test name
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the primitive test name in the DTO is not null and differs
+	 *         from the existing script's primitive test name, false otherwise
+	 */
+	private boolean hasPrimitiveTestChanged(ScriptDTO dto, Script existing) {
+		return dto.getPrimitiveTestName() != null
+				&& !dto.getPrimitiveTestName().equals(existing.getPrimitiveTest().getName());
+	}
+
+	/**
+	 * Checks if the synopsis field has changed between the provided DTO and
+	 * existing entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the new synopsis value to compare
+	 * @param existing the existing Script entity with the current synopsis value
+	 * @return true if the DTO contains a non-null synopsis that differs from the
+	 *         existing synopsis,
+	 *         false if the DTO synopsis is null or matches the existing synopsis
+	 */
+	private boolean hasSynopsisChanged(ScriptDTO dto, Script existing) {
+		return dto.getSynopsis() != null && !dto.getSynopsis().equals(existing.getSynopsis());
+	}
+
+	/**
+	 * Checks if the execution timeout value has changed between the provided
+	 * ScriptDTO and existing Script.
+	 * 
+	 * @param dto      the ScriptDTO containing the new execution timeout value
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the existing script has no timeout set (null) or if the
+	 *         timeout values differ,
+	 *         false if both timeout values are equal and non-null
+	 */
+	private boolean hasExecutionTimeoutChanged(ScriptDTO dto, Script existing) {
+		Integer existingTimeout = existing.getExecutionTimeOut();
+		return existingTimeout == null || dto.getExecutionTimeOut() != existing.getExecutionTimeOut();
+	}
+
+	/**
+	 * Checks if the long duration flag has changed between the DTO and existing
+	 * entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the updated long duration value
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the long duration flag has changed, false otherwise
+	 */
+	private boolean hasLongDurationChanged(ScriptDTO dto, Script existing) {
+		return dto.isLongDuration() != existing.isLongDuration();
+	}
+
+	/**
+	 * Checks if the skip execution flag has changed between the provided DTO and
+	 * existing entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the new skip execution value
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the skip execution flags are different, false if they are the
+	 *         same
+	 */
+	private boolean hasSkipExecutionChanged(ScriptDTO dto, Script existing) {
+		return dto.isSkipExecution() != existing.isSkipExecution();
+	}
+
+	/**
+	 * Checks if the test ID has been modified between the provided ScriptDTO and
+	 * existing Script entity.
+	 * 
+	 * @param dto      the ScriptDTO containing potentially updated test ID
+	 *                 information
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the DTO contains a non-null test ID that differs from the
+	 *         existing entity's test ID,
+	 *         false if the test ID is null in the DTO or if both test IDs are equal
+	 */
+	private boolean hasTestIdChanged(ScriptDTO dto, Script existing) {
+		return dto.getTestId() != null && !dto.getTestId().equals(existing.getTestId());
+	}
+
+	/**
+	 * Checks if the objective field has changed between the provided DTO and
+	 * existing entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the new objective value
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the DTO's objective is not null and differs from the existing
+	 *         objective, false otherwise
+	 */
+	private boolean hasObjectiveChanged(ScriptDTO dto, Script existing) {
+		return dto.getObjective() != null && !dto.getObjective().equals(existing.getObjective());
+	}
+
+	/**
+	 * Checks if the priority value has changed between the provided DTO and
+	 * existing entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the new priority value to compare
+	 * @param existing the existing Script entity with the current priority value
+	 * @return true if the DTO has a non-null priority that differs from the
+	 *         existing priority,
+	 *         false if the DTO priority is null or equals the existing priority
+	 */
+	private boolean hasPriorityChanged(ScriptDTO dto, Script existing) {
+		return dto.getPriority() != null && !dto.getPriority().equals(existing.getPriority());
+	}
+
+	/**
+	 * Checks if the release version has been modified between the DTO and existing
+	 * entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the potentially updated release
+	 *                 version
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the DTO has a non-null release version that differs from the
+	 *         existing entity's release version,
+	 *         false otherwise
+	 */
+	private boolean hasReleaseVersionChanged(ScriptDTO dto, Script existing) {
+		return dto.getReleaseVersion() != null && !dto.getReleaseVersion().equals(existing.getReleaseVersion());
+	}
+
+	/**
+	 * Checks if the device types have changed between the existing script and the
+	 * provided DTO.
+	 * 
+	 * @param dto      the ScriptDTO containing the new device types to compare
+	 * @param existing the existing Script entity with current device types
+	 * @return true if the device types have changed, false if they are the same or
+	 *         if the DTO device types are null/empty
+	 */
+	private boolean hasDeviceTypesChanged(ScriptDTO dto, Script existing) {
+		if (dto.getDeviceTypes() == null || dto.getDeviceTypes().isEmpty()) {
+			return false;
+		}
+
+		List<String> existingDeviceTypeNames = existing.getDeviceTypes().stream().map(DeviceType::getName).sorted()
+				.collect(Collectors.toList());
+
+		List<String> newDeviceTypeNames = dto.getDeviceTypes().stream().sorted().collect(Collectors.toList());
+
+		return !existingDeviceTypeNames.equals(newDeviceTypeNames);
+	}
+
+	/**
+	 * Checks if the pre-conditions in the provided ScriptDTO have changed compared
+	 * to the existing Script.
+	 * 
+	 * @param dto      the ScriptDTO containing the new pre-conditions to compare
+	 * @param existing the existing Script entity with current pre-conditions
+	 * @return true if pre-conditions have changed (different size or different
+	 *         content),
+	 *         false if they are the same or if the DTO has no pre-conditions
+	 */
+	private boolean hasPreConditionsChanged(ScriptDTO dto, Script existing) {
+		if (dto.getPreConditions() == null || dto.getPreConditions().isEmpty()) {
+			return false;
+		}
+
+		if (existing.getPreConditions().size() != dto.getPreConditions().size()) {
+			return true;
+		}
+
+		List<String> existingPreConditions = existing.getPreConditions().stream()
+				.map(PreCondition::getPreConditionDescription).sorted().collect(Collectors.toList());
+
+		List<String> newPreConditions = dto.getPreConditions().stream().map(PreConditionDTO::getPreConditionDetails)
+				.sorted().collect(Collectors.toList());
+		return !existingPreConditions.equals(newPreConditions);
+	}
+
+	/**
+	 * Checks if the test steps in the provided ScriptDTO have changed compared to
+	 * the existing Script.
+	 * 
+	 * This method performs a deep comparison of test steps between a DTO and an
+	 * existing entity,
+	 * checking for differences in size, step names, descriptions, and expected
+	 * results.
+	 * 
+	 * @param dto      the ScriptDTO containing the new test steps to compare
+	 * @param existing the existing Script entity with current test steps
+	 * @return true if any test steps have changed (size difference, name,
+	 *         description, or expected result),
+	 *         false if test steps are identical or if the DTO has no test steps
+	 */
+	private boolean hasTestStepsChanged(ScriptDTO dto, Script existing) {
+		if (dto.getTestSteps() == null || dto.getTestSteps().isEmpty()) {
+			return false;
+		}
+
+		if (existing.getTestSteps().size() != dto.getTestSteps().size()) {
+			return true;
+		}
+
+		// Compare test steps
+		for (int i = 0; i < dto.getTestSteps().size(); i++) {
+			TestStepDTO newStep = dto.getTestSteps().get(i);
+			TestStep existingStep = existing.getTestSteps().get(i);
+
+			if (!newStep.getStepName().equals(existingStep.getStepName())
+					|| !newStep.getStepDescription().equals(existingStep.getStepDescription())
+					|| !newStep.getExpectedResult().equals(existingStep.getExpectedResult())) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 }
