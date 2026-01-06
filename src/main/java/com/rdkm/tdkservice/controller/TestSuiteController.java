@@ -388,4 +388,87 @@ public class TestSuiteController {
 		}
 	}
 
+	/**
+	 * This method is used to download custom/non-module test suites as archive (ZIP
+	 * or TAR.GZ) (test suites whose names don't match any module name)
+	 * 
+	 * @param category - the test suite category
+	 * @param format   - the archive format (zip or tar.gz), default is zip
+	 * @return ResponseEntity - the response entity with archive file
+	 */
+	@Operation(summary = "Download custom test suites as archive by category", description = "Download custom (non-module) test suites as xml in an archive file (ZIP or TAR.GZ) by category")
+	@ApiResponse(responseCode = "200", description = "Custom test suites downloaded successfully")
+	@ApiResponse(responseCode = "400", description = "Bad request - Invalid format or category")
+	@ApiResponse(responseCode = "404", description = "No custom test suites found")
+	@ApiResponse(responseCode = "500", description = "Issue in downloading custom test suites")
+	@GetMapping("/downloadCustomTestSuiteXml")
+	public ResponseEntity<?> downloadCustomTestSuiteXML(@RequestParam String category,
+			@RequestParam(defaultValue = "zip") String format) {
+
+		LOGGER.info("Received download custom test suite request for category: {} in format: {}", category, format);
+
+		// Validate format parameter
+		format = format.toLowerCase().trim();
+		if (!format.equals("zip") && !format.equals("tar.gz") && !format.equals("tgz")) {
+			LOGGER.error("Invalid format: {}. Supported formats are: zip, tar.gz, tgz", format);
+			throw new TDKServiceException("Invalid format. Supported formats are: zip, tar.gz, tgz");
+		}
+
+		ByteArrayInputStream inputStream;
+		String contentType;
+		String fileExtension;
+
+		// Process based on format
+		if (format.equals("tar.gz") || format.equals("tgz")) {
+			inputStream = testSuiteService.downloadCustomTestSuiteAsTarGz(category);
+			contentType = "application/gzip";
+			fileExtension = ".tar.gz";
+		} else {
+			// Default to ZIP
+			inputStream = testSuiteService.downloadCustomTestSuiteAsXML(category);
+			contentType = "application/zip";
+			fileExtension = ".zip";
+		}
+
+		if (inputStream == null || inputStream.available() == 0) {
+			LOGGER.error("Error in downloading custom test suites as {}", format);
+			throw new TDKServiceException("Error in downloading custom test suites");
+		}
+
+		// Prepare response with the archive file
+		HttpHeaders headers = new HttpHeaders();
+		String filename = "Custom_TestSuites_" + category + fileExtension;
+		headers.add("Content-Disposition", "attachment; filename=" + filename);
+
+		LOGGER.info("Downloaded custom test suites as {} for category: {}", format, category);
+
+		return ResponseEntity.status(HttpStatus.OK).headers(headers).contentType(MediaType.parseMediaType(contentType))
+				.body(new InputStreamResource(inputStream));
+	}
+
+	/**
+	 * This method is used to upload multiple test suites from an archive file (ZIP
+	 * or TAR.GZ)
+	 * 
+	 * @param archiveFile - the archive file containing multiple test suite XML
+	 *                    files
+	 * @return ResponseEntity - the response entity
+	 */
+	@Operation(summary = "Upload multiple test suites from archive", description = "Upload multiple test suites from a ZIP or TAR.GZ archive file containing XML files")
+	@ApiResponse(responseCode = "200", description = "Test suites uploaded successfully")
+	@ApiResponse(responseCode = "400", description = "Bad request - Invalid file format")
+	@ApiResponse(responseCode = "500", description = "Issue in uploading test suites")
+	@PostMapping("/uploadAllTestSuitesArchive")
+	public ResponseEntity<Response> uploadAllTestSuitesFromArchive(
+			@RequestPart("archiveFile") MultipartFile archiveFile) {
+
+		LOGGER.info("Received upload all test suites from archive request: {}",
+				archiveFile.getOriginalFilename());
+
+		String result = testSuiteService.uploadAllTestSuitesFromArchive(archiveFile);
+
+		LOGGER.info("Test suites upload completed: {}", result);
+		return ResponseUtils.getSuccessResponse(result);
+	}
+
 }
