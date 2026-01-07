@@ -26,7 +26,10 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -39,6 +42,9 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -561,11 +567,27 @@ public class TestSuiteService implements ITestSuiteService {
 	public boolean uploadTestSuiteAsXML(MultipartFile testSuiteXMLFile) {
 		// Validate the uploaded file
 		validateFile(testSuiteXMLFile);
+		String testSuiteName = testSuiteXMLFile.getOriginalFilename().replace(Constants.XML_EXTENSION,
+				Constants.EMPTY_STRING);
 		try {
-
-			String testSuiteName = testSuiteXMLFile.getOriginalFilename().replace(Constants.XML_EXTENSION,
-					Constants.EMPTY_STRING);
 			InputStream xmlInputStream = testSuiteXMLFile.getInputStream();
+			return uploadTestSuiteXml(xmlInputStream, testSuiteName);
+		} catch (Exception e) {
+			LOGGER.error("Error while uploading test suite from XML file", e);
+			throw new TDKServiceException("Error while uploading test suite from XML file");
+		}
+	}
+
+	/**
+	 * This method is used to upload the test suite from XML input stream
+	 * 
+	 * @param xmlInputStream - the XML input stream
+	 * @param testSuiteName  - the test suite name
+	 * @return - true if the test suite is uploaded successfully, false otherwise
+	 */
+	public boolean uploadTestSuiteXml(InputStream xmlInputStream, String testSuiteName) {
+		LOGGER.info("Uploading test suite from XML for the test suite: " + testSuiteName);
+		try {
 			// Parse XML
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 			DocumentBuilder builder = factory.newDocumentBuilder();
@@ -873,6 +895,366 @@ public class TestSuiteService implements ITestSuiteService {
 		testSuites.sort(Comparator.comparing(TestSuite::getName, String.CASE_INSENSITIVE_ORDER));
 
 		return testSuites.stream().map(MapperUtils::convertToTestSuiteDetailsResponse).collect(Collectors.toList());
+	}
+
+	/**
+	 * This method is used to download custom/non-module test suites as XML
+	 * (test suites whose names don't match any module name)
+	 * 
+	 * @param category - the category
+	 * @return the custom test suites as XML in a zip file
+	 */
+	@Override
+	public ByteArrayInputStream downloadCustomTestSuiteAsXML(String category) {
+		LOGGER.info("Downloading custom (non-module) test suites as XML for the category: " + category);
+
+		List<TestSuite> customTestSuites = this.getCustomTestSuitesByCategory(category);
+		// Create ZIP file with custom test suites
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		ZipOutputStream zipOut = new ZipOutputStream(out);
+		for (TestSuite testSuite : customTestSuites) {
+			try {
+				ByteArrayInputStream testSuiteXML = downloadTestSuiteAsXML(testSuite.getName());
+				ZipEntry zipEntry = new ZipEntry(testSuite.getName() + ".xml");
+				zipOut.putNextEntry(zipEntry);
+				byte[] bytes = testSuiteXML.readAllBytes();
+				zipOut.write(bytes, 0, bytes.length);
+				zipOut.closeEntry();
+				LOGGER.debug("Added test suite {} to zip", testSuite.getName());
+			} catch (ResourceNotFoundException e) {
+				LOGGER.warn("Test suite not found: {}. Skipping.", testSuite.getName());
+			} catch (Exception e) {
+				LOGGER.error("Error while creating zip file for test suite: {}", testSuite.getName(), e);
+			}
+		}
+
+		try {
+			zipOut.close();
+		} catch (Exception e) {
+			LOGGER.error("Error while closing zip output stream", e);
+			throw new TDKServiceException("Error while closing zip output stream");
+		}
+
+		LOGGER.info("Successfully downloaded custom test suites zip file for category {}", category);
+		return new ByteArrayInputStream(out.toByteArray());
+	}
+
+	/**
+	 * This method is used to download custom/non-module test suites as TAR.GZ
+	 * (test suites whose names don't match any module name)
+	 * 
+	 * @param category - the category
+	 * @return the custom test suites as TAR.GZ
+	 */
+	@Override
+	public ByteArrayInputStream downloadCustomTestSuiteAsTarGz(String category) {
+		LOGGER.info("Downloading custom (non-module) test suites as TAR.GZ for the category: " + category);
+
+		List<TestSuite> customTestSuites = this.getCustomTestSuitesByCategory(category);
+		// Create TAR.GZ file with custom test suites
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+		try (GZIPOutputStream gzipOut = new GZIPOutputStream(out);
+				TarArchiveOutputStream tarOut = new TarArchiveOutputStream(gzipOut)) {
+
+			// Set long file mode for tar archives (supports filenames > 100 chars)
+			tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+			tarOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+
+			for (TestSuite testSuite : customTestSuites) {
+				try {
+					ByteArrayInputStream testSuiteXML = downloadTestSuiteAsXML(testSuite.getName());
+					byte[] bytes = testSuiteXML.readAllBytes();
+
+					// Create tar entry
+					String entryName = testSuite.getName() + ".xml";
+					TarArchiveEntry tarEntry = new TarArchiveEntry(entryName);
+					tarEntry.setSize(bytes.length);
+					tarEntry.setModTime(System.currentTimeMillis());
+
+					tarOut.putArchiveEntry(tarEntry);
+					tarOut.write(bytes);
+					tarOut.closeArchiveEntry();
+					LOGGER.debug("Added test suite {} to tar.gz", testSuite.getName());
+				} catch (ResourceNotFoundException e) {
+					LOGGER.warn("Test suite not found: {}. Skipping.", testSuite.getName());
+				} catch (Exception e) {
+					LOGGER.error("Error while creating tar.gz file for test suite: {}", testSuite.getName(), e);
+				}
+			}
+
+			tarOut.finish();
+
+		} catch (Exception e) {
+			LOGGER.error("Error while closing tar.gz output stream", e);
+			throw new TDKServiceException("Error while creating tar.gz archive");
+		}
+
+		LOGGER.info("Successfully downloaded custom test suites as TAR.GZ for category {}", category);
+		return new ByteArrayInputStream(out.toByteArray());
+	}
+
+	/**
+	 * This method is used to get the list of custom/non-module test suites
+	 * (test suites whose names don't match any module name)
+	 * 
+	 * @param category - the category
+	 * @return the list of custom test suites
+	 */
+	public List<TestSuite> getCustomTestSuitesByCategory(String category) {
+		LOGGER.info("Fetching custom (non-module) test suites for the category: " + category);
+		Category categoryObj = commonService.validateCategory(category);
+
+		// Get all test suites for the category
+		List<TestSuite> testSuiteList;
+		if (Category.RDKV.equals(categoryObj)) {
+			testSuiteList = testSuiteRepository
+					.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
+		} else {
+			testSuiteList = testSuiteRepository.findAllByCategory(categoryObj);
+		}
+
+		if (testSuiteList == null || testSuiteList.isEmpty()) {
+			LOGGER.error("No test suites found for the category: " + category);
+			throw new ResourceNotFoundException("Custom test suite for category ", category);
+		}
+
+		// Get all module names for the category
+		List<Module> modules;
+		if (Category.RDKV.equals(categoryObj)) {
+			modules = moduleRepository.findAllByCategoryIn(Arrays.asList(Category.RDKV, Category.RDKV_RDKSERVICE));
+		} else {
+			modules = moduleRepository.findAllByCategory(categoryObj);
+		}
+
+		// Create a set of module names for faster lookup
+		Set<String> moduleNames = modules.stream()
+				.map(Module::getName)
+				.collect(Collectors.toSet());
+
+		LOGGER.info("Found {} modules for category {}", moduleNames.size(), category);
+
+		// Filter test suites to exclude those whose names match module names
+		List<TestSuite> customTestSuites = testSuiteList.stream()
+				.filter(testSuite -> !moduleNames.contains(testSuite.getName()))
+				.collect(Collectors.toList());
+
+		if (customTestSuites.isEmpty()) {
+			LOGGER.error("No custom test suites found for the category: " + category);
+			throw new ResourceNotFoundException("Custom Test Suites for", category);
+		}
+
+		LOGGER.info("Found {} custom test suites (out of {} total) for category {}",
+				customTestSuites.size(), testSuiteList.size(), category);
+		return customTestSuites;
+	}
+
+	/**
+	 * This method is used to upload multiple test suites from an archive file (ZIP
+	 * or TAR.GZ)
+	 * 
+	 * @param archiveFile - the archive file containing multiple test suite XML
+	 *                    files
+	 * @return String - Summary message of the upload operation
+	 */
+	@Override
+	public String uploadAllTestSuitesFromArchive(MultipartFile archiveFile) {
+		LOGGER.info("Uploading all test suites from archive file: {}", archiveFile.getOriginalFilename());
+
+		// Validate the uploaded file
+		validateArchiveFile(archiveFile);
+
+		String fileName = archiveFile.getOriginalFilename();
+		int successCount = 0;
+		int failureCount = 0;
+
+		try {
+			// Determine file type and process accordingly
+			if (fileName.endsWith(".zip")) {
+				LOGGER.info("Processing ZIP archive");
+				Map<String, Integer> result = processZipArchive(archiveFile);
+				successCount = result.get("success");
+				failureCount = result.get("failure");
+			} else if (fileName.endsWith(".tar.gz") || fileName.endsWith(".tgz")) {
+				LOGGER.info("Processing TAR.GZ archive");
+				Map<String, Integer> result = processTarGzArchive(archiveFile);
+				successCount = result.get("success");
+				failureCount = result.get("failure");
+			} else {
+				throw new UserInputException("Unsupported file format. Only ZIP and TAR.GZ files are supported.");
+			}
+
+		} catch (Exception e) {
+			LOGGER.error("Error while uploading test suites from archive", e);
+			throw new TDKServiceException("Error while uploading test suites from archive: " + e.getMessage());
+		}
+
+		String message = String.format(
+				"Upload completed. Success: %d, Failed: %d",
+				successCount, failureCount);
+		LOGGER.info(message);
+
+		return message;
+	}
+
+	/**
+	 * Process ZIP archive and upload test suites
+	 * 
+	 * @param inputStream - the input stream of the ZIP file
+	 * @return Map with success, failure, and skipped counts
+	 * @throws Exception
+	 */
+	private Map<String, Integer> processZipArchive(MultipartFile archiveFile) throws Exception {
+		int successCount = 0;
+		int failureCount = 0;
+		InputStream inputStream = archiveFile.getInputStream();
+		try (ZipInputStream zipIn = new ZipInputStream(inputStream)) {
+			ZipEntry entry;
+
+			while ((entry = zipIn.getNextEntry()) != null) {
+				if (!entry.isDirectory() && entry.getName().endsWith(".xml")) {
+					LOGGER.debug("Processing entry: {}", entry.getName());
+
+					try {
+						// Read the XML content
+						ByteArrayOutputStream out = new ByteArrayOutputStream();
+						byte[] buffer = new byte[1024];
+						int len;
+						while ((len = zipIn.read(buffer)) > 0) {
+							out.write(buffer, 0, len);
+						}
+
+						// Process the test suite XML
+						String testSuiteName = extractTestSuiteNameFromFileName(entry.getName());
+						ByteArrayInputStream xmlInputStream = new ByteArrayInputStream(out.toByteArray());
+						boolean result = uploadTestSuiteXml(xmlInputStream, testSuiteName);
+
+						if (result) {
+							successCount++;
+						} else {
+							failureCount++;
+						}
+
+					} catch (Exception e) {
+						LOGGER.error("Error processing entry: {}", entry.getName(), e);
+						failureCount++;
+					}
+				}
+				zipIn.closeEntry();
+			}
+		}
+
+		Map<String, Integer> result = new HashMap<>();
+		result.put("success", successCount);
+		result.put("failure", failureCount);
+
+		return result;
+	}
+
+	/**
+	 * Process TAR.GZ archive and upload test suites
+	 * 
+	 * @param inputStream - the input stream of the TAR.GZ file
+	 * @return Map with success, failure, and skipped counts
+	 * @throws Exception
+	 */
+	private Map<String, Integer> processTarGzArchive(MultipartFile archiveFile) throws Exception {
+		int successCount = 0;
+		int failureCount = 0;
+		InputStream inputStream = archiveFile.getInputStream();
+		try (GZIPInputStream gzipIn = new GZIPInputStream(inputStream);
+				TarArchiveInputStream tarIn = new TarArchiveInputStream(gzipIn)) {
+
+			TarArchiveEntry entry;
+
+			while ((entry = tarIn.getNextTarEntry()) != null) {
+				if (!entry.isDirectory() && entry.getName().endsWith(".xml")) {
+					LOGGER.debug("Processing entry: {}", entry.getName());
+
+					try {
+						// Read the XML content
+						ByteArrayOutputStream out = new ByteArrayOutputStream();
+						byte[] buffer = new byte[1024];
+						int len;
+						while ((len = tarIn.read(buffer)) > 0) {
+							out.write(buffer, 0, len);
+						}
+
+						// Process the test suite XML
+						String testSuiteName = extractTestSuiteNameFromFileName(entry.getName());
+						ByteArrayInputStream xmlInputStream = new ByteArrayInputStream(out.toByteArray());
+						boolean result = uploadTestSuiteXml(xmlInputStream, testSuiteName);
+
+						if (result) {
+							successCount++;
+						} else {
+							failureCount++;
+						}
+
+					} catch (Exception e) {
+						LOGGER.error("Error processing entry: {}", entry.getName(), e);
+						failureCount++;
+					}
+				}
+			}
+		}
+
+		Map<String, Integer> result = new HashMap<>();
+		result.put("success", successCount);
+		result.put("failure", failureCount);
+
+		return result;
+	}
+
+	/**
+	 * Extract test suite name from file name
+	 * 
+	 * @param fileName - the file name with path
+	 * @return String - the test suite name without extension
+	 */
+	private String extractTestSuiteNameFromFileName(String fileName) {
+		// Remove path and extension
+		String name = fileName;
+
+		// Remove directory path if present
+		if (name.contains("/")) {
+			name = name.substring(name.lastIndexOf("/") + 1);
+		}
+		if (name.contains("\\")) {
+			name = name.substring(name.lastIndexOf("\\") + 1);
+		}
+
+		// Remove .xml extension
+		if (name.endsWith(".xml")) {
+			name = name.substring(0, name.length() - 4);
+		}
+
+		return name;
+	}
+
+	/**
+	 * Validates the uploaded archive file
+	 *
+	 * @param file the uploaded archive file
+	 */
+	private void validateArchiveFile(MultipartFile file) {
+		String fileName = file.getOriginalFilename();
+
+		if (fileName == null) {
+			LOGGER.error("File name is null");
+			throw new UserInputException("File name cannot be null.");
+		}
+
+		if (!fileName.endsWith(".zip") && !fileName.endsWith(".tar.gz") && !fileName.endsWith(".tgz")) {
+			LOGGER.error("Invalid file format: {}", fileName);
+			throw new UserInputException("The uploaded file must be a .zip, .tar.gz, or .tgz file.");
+		}
+
+		if (file.isEmpty()) {
+			LOGGER.error("The uploaded file is empty");
+			throw new UserInputException("The uploaded file is empty.");
+		}
+
 	}
 
 }
