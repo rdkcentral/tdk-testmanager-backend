@@ -77,7 +77,7 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(UsernameNotFoundException.class)
 	public ResponseEntity<String> handleUsernameNotFoundException() {
-		return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Incorrect username or password");
 	}
 
 	/**

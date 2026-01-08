@@ -339,12 +339,36 @@ public class ScriptController {
 		}
 		if (scriptUpload) {
 			LOGGER.info("ZIP file has been successfully processed");
-			return ResponseUtils.getSuccessResponse("ZIP file has been successfully processed");
+			return ResponseUtils.getSuccessResponse("Script uploaded successfully");
 		} else {
 			LOGGER.error("Error in processing ZIP file");
 			throw new TDKServiceException("Error in processing ZIP file");
 		}
 
+	}
+
+	/**
+	 * This method is used to download the script as tar.gz
+	 * 
+	 * @param scriptName - the script name
+	 * @return ResponseEntity - the response entity
+	 */
+	@Operation(summary = "Download Script as tar.gz", description = "Download Script as tar.gz archive")
+	@ApiResponse(responseCode = "200", description = "Script downloaded successfully as tar.gz")
+	@ApiResponse(responseCode = "400", description = "Bad request")
+	@GetMapping("/downloadScriptDataTarGz")
+	public ResponseEntity<?> downloadScriptTarGz(@RequestParam String scriptName) {
+		byte[] tarGzBytes = scriptService.generateScriptTarGz(scriptName);
+		if (tarGzBytes == null) {
+			LOGGER.error("Error in downloading script as tar.gz");
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error in downloading script as tar.gz");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + scriptName + ".tar.gz");
+		LOGGER.info("Script downloaded successfully as tar.gz");
+		return ResponseEntity.status(HttpStatus.OK).headers(headers).contentType(MediaType.APPLICATION_OCTET_STREAM)
+				.body(tarGzBytes);
 	}
 
 	/**

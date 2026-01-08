@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -52,6 +53,10 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -210,11 +215,13 @@ public class ScriptService implements IScriptService {
 			throw new TDKServiceException("Module not found for the primitive test: " + primitiveTest.getName());
 		}
 		script.setModule(module);
-//TODO: Need to implement later
-//		if (module.getExecutionTime() < script.getExecutionTimeOut()) {
-//			LOGGER.error("Script execution time out cannot be greater than module execution time");
-//			throw new UserInputException("Script execution time out cannot be greater than module execution time");
-//		}
+		// TODO: Need to implement later
+		// if (module.getExecutionTime() < script.getExecutionTimeOut()) {
+		// LOGGER.error("Script execution time out cannot be greater than module
+		// execution time");
+		// throw new UserInputException("Script execution time out cannot be greater
+		// than module execution time");
+		// }
 
 		// Set the category based on the module
 		Category category = this.getCategoryBasedOnModule(module);
@@ -275,6 +282,11 @@ public class ScriptService implements IScriptService {
 		Script script = scriptRepository.findById(scriptUpdateDTO.getId()).orElseThrow(
 				() -> new ResourceNotFoundException(Constants.SCRIPT_ID, scriptUpdateDTO.getId().toString()));
 
+		boolean hasEntityChanges = checkIfEntityChangesExist(scriptUpdateDTO, script);
+		if (!hasEntityChanges) {
+			this.updateScriptFileOnly(scriptFile, scriptUpdateDTO, script);
+			return true;
+		}
 		// Check if the script name is being updated and if it already exists in the
 		// database
 		if (!Utils.isEmpty(scriptUpdateDTO.getName())) {
@@ -336,11 +348,13 @@ public class ScriptService implements IScriptService {
 			throw new TDKServiceException("Module not found for the primitive test: " + primitiveTest.getName());
 		}
 		script.setModule(module);
-//TODO: Need to implement later
-//		if (module.getExecutionTime() < scriptUpdateDTO.getExecutionTimeOut()) {
-//			LOGGER.error("Script execution time out cannot be greater than module execution time");
-//			throw new UserInputException("Script execution time out cannot be greater than module execution time");
-//		}
+		// TODO: Need to implement later
+		// if (module.getExecutionTime() < scriptUpdateDTO.getExecutionTimeOut()) {
+		// LOGGER.error("Script execution time out cannot be greater than module
+		// execution time");
+		// throw new UserInputException("Script execution time out cannot be greater
+		// than module execution time");
+		// }
 
 		// Set the category based on the module
 		Category category = this.getCategoryBasedOnModule(module);
@@ -426,6 +440,55 @@ public class ScriptService implements IScriptService {
 			preCondition.setScript(script);
 			script.getPreConditions().add(preCondition);
 		}
+	}
+
+	/**
+	 * Checks if any entity changes exist between the DTO and existing script. This
+	 * is a helper method that returns boolean instead of throwing exception.
+	 * 
+	 * @param scriptUpdateDTO - the script update DTO with new values
+	 * @param existingScript  - the existing script entity from database
+	 * @return true if any entity changes are detected, false otherwise
+	 */
+	private boolean checkIfEntityChangesExist(ScriptDTO scriptUpdateDTO, Script existingScript) {
+		return hasNameChanged(scriptUpdateDTO, existingScript)
+				|| hasPrimitiveTestChanged(scriptUpdateDTO, existingScript)
+				|| hasSynopsisChanged(scriptUpdateDTO, existingScript)
+				|| hasExecutionTimeoutChanged(scriptUpdateDTO, existingScript)
+				|| hasLongDurationChanged(scriptUpdateDTO, existingScript)
+				|| hasSkipExecutionChanged(scriptUpdateDTO, existingScript)
+				|| hasTestIdChanged(scriptUpdateDTO, existingScript)
+				|| hasObjectiveChanged(scriptUpdateDTO, existingScript)
+				|| hasPriorityChanged(scriptUpdateDTO, existingScript)
+				|| hasReleaseVersionChanged(scriptUpdateDTO, existingScript)
+				|| hasDeviceTypesChanged(scriptUpdateDTO, existingScript)
+				|| hasPreConditionsChanged(scriptUpdateDTO, existingScript)
+				|| hasTestStepsChanged(scriptUpdateDTO, existingScript);
+	}
+
+	/**
+	 * Updates only the script file for an existing script without modifying other
+	 * script properties.
+	 * This method handles the validation and replacement of the script file if a
+	 * new file is provided.
+	 *
+	 * @param scriptFile      the new script file to upload; if empty, no update is
+	 *                        performed
+	 * @param scriptUpdateDTO the DTO containing script update information
+	 *                        (currently unused in this method)
+	 * @param script          the existing script entity containing name and
+	 *                        location information for validation
+	 * @throws RuntimeException if script file validation fails
+	 * @throws IOException      if file saving operation fails
+	 */
+	private void updateScriptFileOnly(MultipartFile scriptFile, ScriptDTO scriptUpdateDTO, Script script) {
+		// If the script file is updated, validate and save the new script file
+		if (!scriptFile.isEmpty()) {
+			this.validateScriptFile(scriptFile, script.getName(), script.getScriptLocation());
+			// This will replave the existing file with the new file
+			this.saveScriptFile(scriptFile, script.getScriptLocation());
+		}
+
 	}
 
 	/**
@@ -940,110 +1003,266 @@ public class ScriptService implements IScriptService {
 	}
 
 	/**
-	 * Upload a ZIP file containing a Python script and an XML file with the script
+	 * Upload a ZIP or TAR.GZ file containing a Python script and an XML file with
+	 * the script
 	 * details
 	 * 
-	 * @param file - the ZIP file
-	 * @return true if the ZIP file is uploaded successfully, false otherwise
+	 * @param file - the ZIP or TAR.GZ file
+	 * @return true if the file is uploaded successfully, false otherwise
 	 * @throws IOException
 	 */
-
 	@Override
 	public boolean uploadZipFile(MultipartFile file) throws IOException {
-		LOGGER.info("Uploading zip file: " + file.getOriginalFilename());
+		LOGGER.info("Uploading archive file: " + file.getOriginalFilename());
 
-		// Validate file is a zip
-		if (!file.getContentType().equals("application/zip")
-				&& !file.getOriginalFilename().endsWith(Constants.ZIP_EXTENSION)) {
-			LOGGER.error("Only ZIP files are allowed");
-			throw new UserInputException("Only ZIP files are allowed");
+		String fileName = file.getOriginalFilename();
+		boolean isZipFile = false;
+		boolean isTarGzFile = false;
+
+		// Validate file type
+		if ((file.getContentType() != null && file.getContentType().equals("application/zip"))
+				|| (fileName != null && fileName.endsWith(Constants.ZIP_EXTENSION))) {
+			isZipFile = true;
+		} else if ((file.getContentType() != null &&
+				(file.getContentType().equals("application/gzip") ||
+						file.getContentType().equals("application/x-gzip") ||
+						file.getContentType().equals("application/x-tar") ||
+						file.getContentType().equals("application/x-compressed-tar")))
+				|| (fileName != null &&
+						(fileName.endsWith(".tar.gz") || fileName.endsWith(".tgz")))) {
+			isTarGzFile = true;
+		} else {
+			LOGGER.error("Only ZIP and TAR.GZ files are allowed");
+			throw new UserInputException("Only ZIP and TAR.GZ files are allowed");
 		}
 
-		// Create a temporary file to store the uploaded zip
-		File tempZipFile = File.createTempFile("uploaded-", Constants.ZIP_EXTENSION);
-		file.transferTo(tempZipFile);
+		MultipartFile pythonFile = null;
+		ScriptCreateDTO scriptCreateDTO = null;
+		String scriptId = null;
 
-		try (ZipFile zip = new ZipFile(tempZipFile)) {
-			Enumeration<? extends ZipEntry> entries = zip.entries();
-			boolean pythonFileExists = false;
-			boolean xmlFileExists = false;
-			MultipartFile pythonFile = null;
-			ScriptCreateDTO scriptCreateDTO = null;
+		if (isZipFile) {
+			// Handle ZIP file processing
+			File tempZipFile = File.createTempFile("uploaded-", Constants.ZIP_EXTENSION);
+			file.transferTo(tempZipFile);
 
-			// First pass to check if both Python (.py) and XML (.xml) files exist
-			while (entries.hasMoreElements()) {
-				ZipEntry entry = entries.nextElement();
-				// Check for Python file
-				if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
-					pythonFileExists = true;
+			try (ZipFile zip = new ZipFile(tempZipFile)) {
+				boolean[] fileExists = validateAndExtractFromZip(zip);
+				if (!fileExists[0] || !fileExists[1]) {
+					LOGGER.error("Both Python and XML files are required in the archive file.");
+					throw new UserInputException("Both Python and XML files are required in the archive file.");
 				}
-				// Check for XML file
-				if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
-					xmlFileExists = true;
-				}
-			}
-			// If either Python or XML file is missing, throw a UserInputException
-			if (!pythonFileExists || !xmlFileExists) {
-				LOGGER.error("Both Python and XML files are required in the ZIP file.");
-				throw new UserInputException("Both Python and XML files are required in the ZIP file.");
-			}
 
-			// Reset entries to process the files now that we know both exist
-			entries = zip.entries();
-			String scriptId = null;
-			// Process the Python and XML files
-			while (entries.hasMoreElements()) {
-				ZipEntry entry = entries.nextElement();
-				// Handle Python file
-				if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
-					try (InputStream pyInputStream = zip.getInputStream(entry)) {
-						// Convert Python file to MultipartFile
+				Object[] extractedFiles = extractFilesFromZip(zip);
+				pythonFile = (MultipartFile) extractedFiles[0];
+				scriptCreateDTO = (ScriptCreateDTO) extractedFiles[1];
+				scriptId = (String) extractedFiles[2];
 
-						String[] parts = entry.getName().split("/");
-						String fileName = parts[parts.length - 1];
-						System.out.println("File Name is" + fileName);
-						pythonFile = convertScriptFileToMultipartFile(pyInputStream, fileName);
-
-					}
-				}
-				// Handle XML file
-				else if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
-					try (InputStream xmlInputStream = zip.getInputStream(entry)) {
-						// Convert XML file to ScriptCreateDTO
-						byte[] xmlBytes = xmlInputStream.readAllBytes();
-						scriptId = extractScriptIDFromXml(new ByteArrayInputStream(xmlBytes));
-						scriptCreateDTO = convertXmlToScriptCreateDTO(new ByteArrayInputStream(xmlBytes));
-
-					}
-				}
-			}
-
-			// Validate that both files were processed
-			if (pythonFile != null && scriptCreateDTO != null) {
-
-				String scriptName = scriptCreateDTO.getName();
-				Script script = scriptRepository.findByName(scriptName);
-				boolean saveOrUpdateScript = false;
-				if (script == null) {
-					LOGGER.error("Script going to be save as new: " + scriptName);
-					saveOrUpdateScript = saveNewScript(pythonFile, scriptCreateDTO, scriptId);
-				} else {
-					LOGGER.error("Script going to be updated: " + scriptName);
-					ScriptDTO scriptDTO = MapperUtils.convertToScriptDTOForXMLUpdate(scriptCreateDTO, script);
-					saveOrUpdateScript = updateScriptFromXML(pythonFile, scriptDTO, script);
-				}
-				// boolean savedScript = saveScript(pythonFile, scriptCreateDTO);
-
+			} finally {
 				tempZipFile.delete();
-				LOGGER.info("Script XML saved successfully");
-				return saveOrUpdateScript;
-			} else {
-				LOGGER.error(
-						"Error processing the zip file, either the XML or Python file was not processed correctly.");
-				throw new TDKServiceException("Error processing the zip file: XML or Python file processing failed.");
+			}
+
+		} else if (isTarGzFile) {
+			// Handle TAR.GZ file processing
+			try (InputStream fileInputStream = file.getInputStream();
+					GZIPInputStream gzipInputStream = new GZIPInputStream(fileInputStream);
+					TarArchiveInputStream tarInputStream = new TarArchiveInputStream(gzipInputStream)) {
+
+				boolean[] fileExists = validateAndExtractFromTar(tarInputStream);
+				if (!fileExists[0] || !fileExists[1]) {
+					LOGGER.error("Both Python and XML files are required in the archive file.");
+					throw new UserInputException("Both Python and XML files are required in the archive file.");
+				}
+
+				// Reset stream for actual extraction
+				try (InputStream fileInputStream2 = file.getInputStream();
+						GZIPInputStream gzipInputStream2 = new GZIPInputStream(fileInputStream2);
+						TarArchiveInputStream tarInputStream2 = new TarArchiveInputStream(gzipInputStream2)) {
+
+					Object[] extractedFiles = extractFilesFromTar(tarInputStream2);
+					pythonFile = (MultipartFile) extractedFiles[0];
+					scriptCreateDTO = (ScriptCreateDTO) extractedFiles[1];
+					scriptId = (String) extractedFiles[2];
+				}
 			}
 		}
 
+		// Process the extracted files (common logic for both ZIP and TAR.GZ)
+		if (pythonFile != null && scriptCreateDTO != null) {
+			String scriptName = scriptCreateDTO.getName();
+			Script script = scriptRepository.findByName(scriptName);
+			boolean saveOrUpdateScript = false;
+
+			if (script == null) {
+				LOGGER.info("Script going to be saved as new: " + scriptName);
+				saveOrUpdateScript = saveNewScript(pythonFile, scriptCreateDTO, scriptId);
+			} else {
+				LOGGER.info("Script going to be updated: " + scriptName);
+				ScriptDTO scriptDTO = MapperUtils.convertToScriptDTOForXMLUpdate(scriptCreateDTO, script);
+				saveOrUpdateScript = updateScriptFromXML(pythonFile, scriptDTO, script);
+			}
+
+			LOGGER.info("Script processed successfully");
+			return saveOrUpdateScript;
+		} else {
+			LOGGER.error(
+					"Error processing the archive file, either the XML or Python file was not processed correctly.");
+			throw new TDKServiceException("Error processing the archive file: XML or Python file processing failed.");
+		}
+	}
+
+	/**
+	 * Validates and extracts information from a ZIP file to check for required file
+	 * types.
+	 * 
+	 * This method iterates through all entries in the provided ZIP file and checks
+	 * for the
+	 * presence of Python (.py) and XML files based on their file extensions.
+	 * 
+	 * @param zip the ZipFile to validate and extract information from
+	 * @return a boolean array where the first element indicates if at least one
+	 *         Python file
+	 *         exists in the ZIP, and the second element indicates if at least one
+	 *         XML file
+	 *         exists in the ZIP
+	 */
+	private boolean[] validateAndExtractFromZip(ZipFile zip) {
+		boolean pythonFileExists = false;
+		boolean xmlFileExists = false;
+
+		Enumeration<? extends ZipEntry> entries = zip.entries();
+		while (entries.hasMoreElements()) {
+			ZipEntry entry = entries.nextElement();
+			if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+				pythonFileExists = true;
+			}
+			if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
+				xmlFileExists = true;
+			}
+		}
+
+		return new boolean[] { pythonFileExists, xmlFileExists };
+	}
+
+	/**
+	 * Validates and extracts information from a TAR.GZ file to check for required
+	 * file types.
+	 * 
+	 * This method iterates through all entries in the provided TAR.GZ input stream
+	 * and checks for the
+	 * presence of Python (.py) and XML files based on their file extensions.
+	 * 
+	 * @param tarInputStream the TarArchiveInputStream to validate and extract
+	 *                       information from
+	 * @return a boolean array where the first element indicates if at least one
+	 *         Python file
+	 *         exists in the TAR.GZ, and the second element indicates if at least
+	 *         one XML file
+	 *         exists in the TAR.GZ
+	 * @throws IOException if an I/O error occurs while reading the TAR.GZ input
+	 *                     stream
+	 */
+	private boolean[] validateAndExtractFromTar(TarArchiveInputStream tarInputStream) throws IOException {
+		boolean pythonFileExists = false;
+		boolean xmlFileExists = false;
+
+		TarArchiveEntry entry;
+		while ((entry = tarInputStream.getNextTarEntry()) != null) {
+			if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+				pythonFileExists = true;
+			}
+			if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
+				xmlFileExists = true;
+			}
+		}
+
+		return new boolean[] { pythonFileExists, xmlFileExists };
+	}
+
+	/**
+	 * Extracts the Python and XML files from a ZIP file.
+	 * 
+	 * @param zip the ZipFile to extract files from
+	 * @return an array containing the extracted Python MultipartFile,
+	 *         ScriptCreateDTO, and script ID
+	 * @throws IOException if an I/O error occurs while reading the ZIP file
+	 */
+	private Object[] extractFilesFromZip(ZipFile zip) throws IOException {
+		MultipartFile pythonFile = null;
+		ScriptCreateDTO scriptCreateDTO = null;
+		String scriptId = null;
+
+		Enumeration<? extends ZipEntry> entries = zip.entries();
+		while (entries.hasMoreElements()) {
+			ZipEntry entry = entries.nextElement();
+
+			if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+				try (InputStream pyInputStream = zip.getInputStream(entry)) {
+					String[] parts = entry.getName().split("/");
+					String fileName = parts[parts.length - 1];
+					pythonFile = convertScriptFileToMultipartFile(pyInputStream, fileName);
+				}
+			} else if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
+				try (InputStream xmlInputStream = zip.getInputStream(entry)) {
+					byte[] xmlBytes = xmlInputStream.readAllBytes();
+					scriptId = extractScriptIDFromXml(new ByteArrayInputStream(xmlBytes));
+					scriptCreateDTO = convertXmlToScriptCreateDTO(new ByteArrayInputStream(xmlBytes));
+				}
+			}
+		}
+
+		return new Object[] { pythonFile, scriptCreateDTO, scriptId };
+	}
+
+	/**
+	 * Extracts the Python and XML files from a TAR.GZ input stream.
+	 * 
+	 * @param tarInputStream the TarArchiveInputStream to extract files from
+	 * @return an array containing the extracted Python MultipartFile,
+	 *         ScriptCreateDTO, and script ID
+	 * @throws IOException if an I/O error occurs while reading the TAR.GZ input
+	 *                     stream
+	 */
+	private Object[] extractFilesFromTar(TarArchiveInputStream tarInputStream) throws IOException {
+		MultipartFile pythonFile = null;
+		ScriptCreateDTO scriptCreateDTO = null;
+		String scriptId = null;
+
+		TarArchiveEntry entry;
+		while ((entry = tarInputStream.getNextTarEntry()) != null) {
+			if (entry.isFile()) {
+				if (entry.getName().endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+					String[] parts = entry.getName().split("/");
+					String fileName = parts[parts.length - 1];
+
+					// Read all bytes from the tar entry properly
+					ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+					byte[] buffer = new byte[8192];
+					int bytesRead;
+					while ((bytesRead = tarInputStream.read(buffer)) != -1) {
+						outputStream.write(buffer, 0, bytesRead);
+					}
+					byte[] fileContent = outputStream.toByteArray();
+
+					pythonFile = convertScriptFileToMultipartFile(
+							new ByteArrayInputStream(fileContent), fileName);
+
+				} else if (entry.getName().endsWith(Constants.XML_FILE_EXTENSION)) {
+					// Read all bytes from the tar entry properly
+					ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+					byte[] buffer = new byte[8192];
+					int bytesRead;
+					while ((bytesRead = tarInputStream.read(buffer)) != -1) {
+						outputStream.write(buffer, 0, bytesRead);
+					}
+					byte[] xmlBytes = outputStream.toByteArray();
+
+					scriptId = extractScriptIDFromXml(new ByteArrayInputStream(xmlBytes));
+					scriptCreateDTO = convertXmlToScriptCreateDTO(new ByteArrayInputStream(xmlBytes));
+				}
+			}
+		}
+
+		return new Object[] { pythonFile, scriptCreateDTO, scriptId };
 	}
 
 	/**
@@ -1650,6 +1869,279 @@ public class ScriptService implements IScriptService {
 			throw new TDKServiceException("Error generating markdown ZIP by category: " + e.getMessage());
 		}
 		return new ByteArrayInputStream(baos.toByteArray());
+	}
+
+	/**
+	 * Generate a tar.gz file containing a Python script and an XML file with the
+	 * test
+	 * case details
+	 * 
+	 * @param scriptName - the script name
+	 * @return - the tar.gz file as a byte array
+	 */
+	@Override
+	public byte[] generateScriptTarGz(String scriptName) {
+		String xmlContent;
+		File getPythonScriptFile;
+		xmlContent = generateTestCaseXml(scriptName);
+		getPythonScriptFile = getPythonFile(scriptName);
+
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+		try (GzipCompressorOutputStream gzipOut = new GzipCompressorOutputStream(byteArrayOutputStream);
+				TarArchiveOutputStream tarOutputStream = new TarArchiveOutputStream(gzipOut)) {
+
+			// Add XML file to tar
+			byte[] xmlBytes = xmlContent.getBytes(StandardCharsets.UTF_8);
+			TarArchiveEntry xmlEntry = new TarArchiveEntry(scriptName + Constants.XML_FILE_EXTENSION);
+			xmlEntry.setSize(xmlBytes.length);
+			tarOutputStream.putArchiveEntry(xmlEntry);
+			tarOutputStream.write(xmlBytes);
+			tarOutputStream.closeArchiveEntry();
+
+			// Add Python script file to tar
+			byte[] scriptBytes = Files.readAllBytes(getPythonScriptFile.toPath());
+			TarArchiveEntry scriptEntry = new TarArchiveEntry(getPythonScriptFile.getName());
+			scriptEntry.setSize(scriptBytes.length);
+			tarOutputStream.putArchiveEntry(scriptEntry);
+			tarOutputStream.write(scriptBytes);
+			tarOutputStream.closeArchiveEntry();
+
+			tarOutputStream.finish();
+		} catch (FileNotFoundException e) {
+			LOGGER.error("File not found: " + e.getMessage());
+			throw new TDKServiceException("File not found: " + e.getMessage());
+		} catch (IOException e) {
+			LOGGER.error("IO error: " + e.getMessage());
+			throw new TDKServiceException("IO error: " + e.getMessage());
+		}
+
+		return byteArrayOutputStream.toByteArray();
+	}
+
+	/**
+	 * Checks if the name of a script has been changed by comparing the DTO name
+	 * with the existing script name.
+	 * 
+	 * @param dto      the ScriptDTO containing the potentially new name
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the DTO contains a non-null name that differs from the
+	 *         existing script's name, false otherwise
+	 */
+	private boolean hasNameChanged(ScriptDTO dto, Script existing) {
+		return dto.getName() != null && !dto.getName().equals(existing.getName());
+	}
+
+	/**
+	 * Checks if the primitive test name has changed between the DTO and existing
+	 * script.
+	 * 
+	 * @param dto      the ScriptDTO containing the new primitive test name
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the primitive test name in the DTO is not null and differs
+	 *         from the existing script's primitive test name, false otherwise
+	 */
+	private boolean hasPrimitiveTestChanged(ScriptDTO dto, Script existing) {
+		return dto.getPrimitiveTestName() != null
+				&& !dto.getPrimitiveTestName().equals(existing.getPrimitiveTest().getName());
+	}
+
+	/**
+	 * Checks if the synopsis field has changed between the provided DTO and
+	 * existing entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the new synopsis value to compare
+	 * @param existing the existing Script entity with the current synopsis value
+	 * @return true if the DTO contains a non-null synopsis that differs from the
+	 *         existing synopsis,
+	 *         false if the DTO synopsis is null or matches the existing synopsis
+	 */
+	private boolean hasSynopsisChanged(ScriptDTO dto, Script existing) {
+		return dto.getSynopsis() != null && !dto.getSynopsis().equals(existing.getSynopsis());
+	}
+
+	/**
+	 * Checks if the execution timeout value has changed between the provided
+	 * ScriptDTO and existing Script.
+	 * 
+	 * @param dto      the ScriptDTO containing the new execution timeout value
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the existing script has no timeout set (null) or if the
+	 *         timeout values differ,
+	 *         false if both timeout values are equal and non-null
+	 */
+	private boolean hasExecutionTimeoutChanged(ScriptDTO dto, Script existing) {
+		Integer existingTimeout = existing.getExecutionTimeOut();
+		return existingTimeout == null || dto.getExecutionTimeOut() != existing.getExecutionTimeOut();
+	}
+
+	/**
+	 * Checks if the long duration flag has changed between the DTO and existing
+	 * entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the updated long duration value
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the long duration flag has changed, false otherwise
+	 */
+	private boolean hasLongDurationChanged(ScriptDTO dto, Script existing) {
+		return dto.isLongDuration() != existing.isLongDuration();
+	}
+
+	/**
+	 * Checks if the skip execution flag has changed between the provided DTO and
+	 * existing entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the new skip execution value
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the skip execution flags are different, false if they are the
+	 *         same
+	 */
+	private boolean hasSkipExecutionChanged(ScriptDTO dto, Script existing) {
+		return dto.isSkipExecution() != existing.isSkipExecution();
+	}
+
+	/**
+	 * Checks if the test ID has been modified between the provided ScriptDTO and
+	 * existing Script entity.
+	 * 
+	 * @param dto      the ScriptDTO containing potentially updated test ID
+	 *                 information
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the DTO contains a non-null test ID that differs from the
+	 *         existing entity's test ID,
+	 *         false if the test ID is null in the DTO or if both test IDs are equal
+	 */
+	private boolean hasTestIdChanged(ScriptDTO dto, Script existing) {
+		return dto.getTestId() != null && !dto.getTestId().equals(existing.getTestId());
+	}
+
+	/**
+	 * Checks if the objective field has changed between the provided DTO and
+	 * existing entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the new objective value
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the DTO's objective is not null and differs from the existing
+	 *         objective, false otherwise
+	 */
+	private boolean hasObjectiveChanged(ScriptDTO dto, Script existing) {
+		return dto.getObjective() != null && !dto.getObjective().equals(existing.getObjective());
+	}
+
+	/**
+	 * Checks if the priority value has changed between the provided DTO and
+	 * existing entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the new priority value to compare
+	 * @param existing the existing Script entity with the current priority value
+	 * @return true if the DTO has a non-null priority that differs from the
+	 *         existing priority,
+	 *         false if the DTO priority is null or equals the existing priority
+	 */
+	private boolean hasPriorityChanged(ScriptDTO dto, Script existing) {
+		return dto.getPriority() != null && !dto.getPriority().equals(existing.getPriority());
+	}
+
+	/**
+	 * Checks if the release version has been modified between the DTO and existing
+	 * entity.
+	 * 
+	 * @param dto      the ScriptDTO containing the potentially updated release
+	 *                 version
+	 * @param existing the existing Script entity to compare against
+	 * @return true if the DTO has a non-null release version that differs from the
+	 *         existing entity's release version,
+	 *         false otherwise
+	 */
+	private boolean hasReleaseVersionChanged(ScriptDTO dto, Script existing) {
+		return dto.getReleaseVersion() != null && !dto.getReleaseVersion().equals(existing.getReleaseVersion());
+	}
+
+	/**
+	 * Checks if the device types have changed between the existing script and the
+	 * provided DTO.
+	 * 
+	 * @param dto      the ScriptDTO containing the new device types to compare
+	 * @param existing the existing Script entity with current device types
+	 * @return true if the device types have changed, false if they are the same or
+	 *         if the DTO device types are null/empty
+	 */
+	private boolean hasDeviceTypesChanged(ScriptDTO dto, Script existing) {
+		if (dto.getDeviceTypes() == null || dto.getDeviceTypes().isEmpty()) {
+			return false;
+		}
+
+		List<String> existingDeviceTypeNames = existing.getDeviceTypes().stream().map(DeviceType::getName).sorted()
+				.collect(Collectors.toList());
+
+		List<String> newDeviceTypeNames = dto.getDeviceTypes().stream().sorted().collect(Collectors.toList());
+
+		return !existingDeviceTypeNames.equals(newDeviceTypeNames);
+	}
+
+	/**
+	 * Checks if the pre-conditions in the provided ScriptDTO have changed compared
+	 * to the existing Script.
+	 * 
+	 * @param dto      the ScriptDTO containing the new pre-conditions to compare
+	 * @param existing the existing Script entity with current pre-conditions
+	 * @return true if pre-conditions have changed (different size or different
+	 *         content),
+	 *         false if they are the same or if the DTO has no pre-conditions
+	 */
+	private boolean hasPreConditionsChanged(ScriptDTO dto, Script existing) {
+		if (dto.getPreConditions() == null || dto.getPreConditions().isEmpty()) {
+			return false;
+		}
+
+		if (existing.getPreConditions().size() != dto.getPreConditions().size()) {
+			return true;
+		}
+
+		List<String> existingPreConditions = existing.getPreConditions().stream()
+				.map(PreCondition::getPreConditionDescription).sorted().collect(Collectors.toList());
+
+		List<String> newPreConditions = dto.getPreConditions().stream().map(PreConditionDTO::getPreConditionDetails)
+				.sorted().collect(Collectors.toList());
+		return !existingPreConditions.equals(newPreConditions);
+	}
+
+	/**
+	 * Checks if the test steps in the provided ScriptDTO have changed compared to
+	 * the existing Script.
+	 * 
+	 * This method performs a deep comparison of test steps between a DTO and an
+	 * existing entity,
+	 * checking for differences in size, step names, descriptions, and expected
+	 * results.
+	 * 
+	 * @param dto      the ScriptDTO containing the new test steps to compare
+	 * @param existing the existing Script entity with current test steps
+	 * @return true if any test steps have changed (size difference, name,
+	 *         description, or expected result),
+	 *         false if test steps are identical or if the DTO has no test steps
+	 */
+	private boolean hasTestStepsChanged(ScriptDTO dto, Script existing) {
+		if (dto.getTestSteps() == null || dto.getTestSteps().isEmpty()) {
+			return false;
+		}
+
+		if (existing.getTestSteps().size() != dto.getTestSteps().size()) {
+			return true;
+		}
+
+		// Compare test steps
+		for (int i = 0; i < dto.getTestSteps().size(); i++) {
+			TestStepDTO newStep = dto.getTestSteps().get(i);
+			TestStep existingStep = existing.getTestSteps().get(i);
+
+			if (!newStep.getStepName().equals(existingStep.getStepName())
+					|| !newStep.getStepDescription().equals(existingStep.getStepDescription())
+					|| !newStep.getExpectedResult().equals(existingStep.getExpectedResult())) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 }

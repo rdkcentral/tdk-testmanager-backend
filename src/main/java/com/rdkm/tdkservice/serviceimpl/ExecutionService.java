@@ -1698,10 +1698,10 @@ public class ExecutionService implements IExecutionService {
 			executionTriggerDTO.setCategory(execution.getCategory().name());
 			executionTriggerDTO.setExecutionName(execName);
 			executionTriggerDTO.setRepeatCount(1);
-			executionTriggerDTO.setRerunOnFailure(false);
-			executionTriggerDTO.setDeviceLogsNeeded(true);
-			executionTriggerDTO.setDiagnosticLogsNeeded(true);
-			executionTriggerDTO.setPerformanceLogsNeeded(true);
+			executionTriggerDTO.setRerunOnFailure(execution.isRerunOnFailure());
+			executionTriggerDTO.setDeviceLogsNeeded(execution.isDeviceLogsNeeded());
+			executionTriggerDTO.setDiagnosticLogsNeeded(execution.isDiagnosticLogsNeeded());
+			executionTriggerDTO.setPerformanceLogsNeeded(execution.isPerformanceLogsNeeded());
 			this.startExecution(executionTriggerDTO);
 			LOGGER.info("Successfully repeated execution with id: {}", execId);
 		} catch (Exception e) {
@@ -1791,15 +1791,20 @@ public class ExecutionService implements IExecutionService {
 	 * This method is used to delete single the execution detail
 	 * 
 	 * @param id - the execution ID
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
 	 * @return ExecutionDetailsResponse
 	 * @throws ResourceNotFoundException - if the execution is not found
 	 */
-
 	@Override
 	@Transactional
-	public boolean deleteExecution(UUID id) {
+	public boolean deleteExecution(UUID id, boolean isDataDeletionNeeded) {
 		LOGGER.info("Deleting execution with id: {}", id);
+		// First delete all files related to the execution 
 		this.deleteAllFilesForTheExecution(id.toString());
+		if(!isDataDeletionNeeded) {
+			LOGGER.info("Data deletion not needed for execution with id: {}", id);
+			return true;
+		}
 		try {
 			Execution execution = executionRepository.findById(id)
 					.orElseThrow(() -> new ResourceNotFoundException("Execution", id.toString()));
@@ -1843,6 +1848,7 @@ public class ExecutionService implements IExecutionService {
 	 * execution
 	 * 
 	 * @param executionId - the execution ID
+	 * 
 	 */
 	private void deleteAllFilesForTheExecution(String executionId) {
 		LOGGER.info("Deleting all files for the execution with id: {}", executionId);
@@ -1865,17 +1871,18 @@ public class ExecutionService implements IExecutionService {
 	 * This method is used to delete the execution details list
 	 * 
 	 * @param id - the execution ID
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
 	 * @return ExecutionDetailsResponse
 	 * @throws ResourceNotFoundException - if the execution is not found
 	 */
 
 	@Override
 	@Transactional
-	public boolean deleteExecutions(List<UUID> ids) {
+	public boolean deleteExecutions(List<UUID> ids, boolean isDataDeletionNeeded) {
 		LOGGER.info("Deleting executions with ids: {}", ids);
 		try {
 			for (UUID id : ids) {
-				deleteExecution(id);
+				deleteExecution(id, isDataDeletionNeeded);
 			}
 			LOGGER.info("Successfully deleted executions with ids: {}", ids);
 			return true;
@@ -2305,10 +2312,11 @@ public class ExecutionService implements IExecutionService {
 	 * 
 	 * @param fromDate the start date
 	 * @param toDate   end date
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
 	 * @return total executions
 	 */
 	@Override
-	public int deleteExecutionsByDateRange(Instant fromDate, Instant toDate) {
+	public int deleteExecutionsByDateRange(Instant fromDate, Instant toDate, boolean isDataDeletionNeeded) {
 		LOGGER.info("Deleting executions between dates: {} and {}", fromDate, toDate);
 		List<Execution> executions = executionRepository.executionListInDateRange(fromDate, toDate);
 		if (executions.isEmpty()) {
@@ -2317,7 +2325,7 @@ public class ExecutionService implements IExecutionService {
 		}
 		try {
 			for (Execution execution : executions) {
-				deleteExecution(execution.getId());
+				deleteExecution(execution.getId(), isDataDeletionNeeded);
 			}
 			LOGGER.info("Successfully deleted executions between dates: {} and {}", fromDate, toDate);
 			return executions.size();
