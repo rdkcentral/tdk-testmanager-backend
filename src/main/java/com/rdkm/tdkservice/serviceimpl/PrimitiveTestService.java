@@ -422,28 +422,32 @@ public class PrimitiveTestService implements IPrimitiveTestService {
 				String parameterType = parameter.getParameterType();
 
 				if ((ParameterDataType.INTEGER.toString()).equals(parameterType)) {
-					if (!paramValue.isEmpty()) {
+					if (paramValue != null && !paramValue.isEmpty()) {
 						paramsObj.put(paramName, Integer.parseInt(paramValue));
 					} else {
 						// Handle the case where paramValue is empty
 						paramsObj.put(paramName, 0); // or any default value
 					}
 				} else if ((ParameterDataType.DOUBLE.toString()).equals(parameterType)) {
-					if (!paramValue.isEmpty()) {
+					if (paramValue != null && !paramValue.isEmpty()) {
 						paramsObj.put(paramName, Double.parseDouble(paramValue));
 					} else {
 						// Handle the case where paramValue is empty
 						paramsObj.put(paramName, 0.0); // or any default value
 					}
 				} else if ((ParameterDataType.FLOAT.toString()).equals(parameterType)) {
-					if (!paramValue.isEmpty()) {
+					if (paramValue != null && !paramValue.isEmpty()) {
 						paramsObj.put(paramName, Float.parseFloat(paramValue));
 					} else {
 						// Handle the case where paramValue is empty
 						paramsObj.put(paramName, 0.0f); // or any default value
 					}
 				} else {
-					paramsObj.put(paramName, paramValue.trim());
+					if (paramValue != null && !paramValue.trim().isEmpty()) {
+						paramsObj.put(paramName, paramValue.trim());
+					} else {
+						paramsObj.put(paramName, ""); // Default empty string like numeric defaults
+					}
 				}
 
 			}
