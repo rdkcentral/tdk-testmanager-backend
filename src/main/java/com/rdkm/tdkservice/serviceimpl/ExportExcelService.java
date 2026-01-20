@@ -1355,7 +1355,7 @@ public class ExportExcelService implements IExportExcelService {
 				} else {
 					resultData.put("executed", "No");
 				}
-				resultData.put("status", prioritizedResult.getExecution().getResult());
+				resultData.put("status", prioritizedResult.getResult());
 				resultData.put("executedOn",
 						Optional.ofNullable(formatExecutionDateToUTC(prioritizedResult.getDateOfExecution().toString()))
 								.map(date -> date.toString()).orElse("N/A"));
