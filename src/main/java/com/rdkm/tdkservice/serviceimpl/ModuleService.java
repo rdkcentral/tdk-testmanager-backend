@@ -533,7 +533,11 @@ public class ModuleService implements IModuleService {
 			// Find function by name (if present)
 			Function function = null;
 			if (functionName != null && !functionName.isEmpty()) {
-				function = functionRepository.findByNameAndCategory(functionName, module.getCategory());
+				if (module.getCategory() == Category.RDKV_RDKSERVICE || module.getCategory() == Category.RDKV) {
+					function = functionRepository.findByNameAndCategory(functionName, Category.RDKV);
+				} else {
+					function = functionRepository.findByNameAndCategory(functionName, module.getCategory());
+				}
 			}
 
 			PrimitiveTest primitiveTest = primitiveTestMap.get(testName);
