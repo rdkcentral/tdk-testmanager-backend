@@ -560,7 +560,7 @@ public class MapperUtils {
 	 */
 	public static ScriptDTO convertToScriptDTOForXMLUpdate(ScriptCreateDTO createDTO, Script script) {
 		ScriptDTO dto = new ScriptDTO();
-
+		dto.setId(script.getId());
 		dto.setName(createDTO.getName());
 		dto.setSynopsis(createDTO.getSynopsis());
 		dto.setExecutionTimeOut(createDTO.getExecutionTimeOut());
