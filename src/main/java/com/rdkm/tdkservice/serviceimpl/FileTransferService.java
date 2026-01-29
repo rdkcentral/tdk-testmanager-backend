@@ -38,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -60,7 +61,9 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.rdkm.tdkservice.config.AppConfig;
+import com.rdkm.tdkservice.exception.TDKServiceException;
 import com.rdkm.tdkservice.exception.ResourceNotFoundException;
+import com.rdkm.tdkservice.exception.UserInputException;
 import com.rdkm.tdkservice.model.Device;
 import com.rdkm.tdkservice.model.Execution;
 import com.rdkm.tdkservice.model.ExecutionDevice;
@@ -1547,6 +1550,112 @@ public class FileTransferService implements IFileService {
 					file.renameTo(targetFile);
 				}
 			}
+		}
+	}
+
+	/**
+	 * This method is for uploading image files to the destination location via API
+	 * call
+	 * 
+	 * @param imageFile - image file to upload
+	 * @param fileName  - name in which the file needs to be saved
+	 * @return String indicating upload status
+	 */
+	@Override
+	public boolean uploadImage(MultipartFile imageFile, String fileName) {
+		LOGGER.info("Starting uploadImage method.");
+		try {
+			if (imageFile == null || imageFile.isEmpty()) {
+				LOGGER.error("No image file was uploaded or the file is empty.");
+				throw new UserInputException("No image file was uploaded or the file is empty.");
+			}
+
+			// Validate file extension for image types
+			String originalFilename = imageFile.getOriginalFilename();
+			if (originalFilename != null) {
+				String lowerCaseName = originalFilename.toLowerCase();
+				if (!lowerCaseName.endsWith(".png") && !lowerCaseName.endsWith(".jpg") 
+						&& !lowerCaseName.endsWith(".jpeg") && !lowerCaseName.endsWith(".gif")
+						&& !lowerCaseName.endsWith(".bmp")) {
+					LOGGER.warn("Invalid image file type: {}", originalFilename);
+					throw new UserInputException("Invalid image file type. Allowed types: png, jpg, jpeg, gif, bmp");
+				}
+			}
+
+			// Get the upload path for images
+			String uploadImagePath = commonService.getBaseLogPath();
+
+			// Ensure the directory exists
+			File imageDir = new File(uploadImagePath);
+			if (!imageDir.exists()) {
+				imageDir.mkdirs();
+				LOGGER.info("Created directories for image file path: {}", uploadImagePath);
+			}
+
+			// Create the target file path
+			File targetFile = new File(uploadImagePath + Constants.FILE_PATH_SEPERATOR + fileName);
+
+			// Copy the uploaded file to the target location
+			Files.copy(imageFile.getInputStream(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+			LOGGER.info("Image file uploaded successfully: {}", fileName);
+			return true;
+
+		} catch (MaxUploadSizeExceededException e) {
+			LOGGER.error("MaxUploadSizeExceededException: Uploaded file size exceeds the maximum limit.", e);
+			throw new UserInputException("Uploaded file size exceeds the maximum limit.");
+		} catch (IOException e) {
+			LOGGER.error("IOException: An I/O error occurred while processing the image file.", e);
+			throw new TDKServiceException("An I/O error occurred while processing the image file.");
+		} catch (Exception e) {
+			LOGGER.error("uploadImage ERROR: {}", e.getMessage(), e);
+			throw new TDKServiceException("Error uploading image: " + e.getMessage());
+		}
+	}
+
+
+	/**
+	 * This method is for uploading image files from raw binary input stream.
+	 * Used for C++ clients that send raw bytes instead of multipart form data.
+	 * 
+	 * @param inputStream - raw input stream containing image data
+	 * @param fileName    - name in which the file needs to be saved
+	 * @return boolean indicating upload status
+	 */
+	@Override
+	public boolean uploadImageFromStream(InputStream inputStream, String fileName) {
+		LOGGER.info("Starting uploadImageFromStream method.");
+		try {
+			if (inputStream == null || inputStream.available() == 0) {
+				LOGGER.warn("No image data was uploaded or the stream is empty.");
+				throw new UserInputException("No image data was uploaded or the stream is empty.");
+			}
+
+			// Get the upload path for images
+			String uploadImagePath = commonService.getBaseLogPath();
+
+			// Ensure the directory exists
+			File imageDir = new File(uploadImagePath);
+			if (!imageDir.exists()) {
+				imageDir.mkdirs();
+				LOGGER.info("Created directories for image file path: {}", uploadImagePath);
+			}
+
+			// Create the target file path
+			File targetFile = new File(uploadImagePath + Constants.FILE_PATH_SEPERATOR + fileName);
+
+			// Copy the input stream to the target location
+			Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+			LOGGER.info("Image file uploaded successfully from stream: {}", fileName);
+			return true;
+
+		} catch (IOException e) {
+			LOGGER.error("IOException: An I/O error occurred while processing the image stream.", e);
+			throw new TDKServiceException("An I/O error occurred while processing the image stream.");
+		} catch (Exception e) {
+			LOGGER.error("uploadImageFromStream ERROR: {}", e.getMessage(), e);
+			throw new TDKServiceException("Error uploading image: " + e.getMessage());
 		}
 	}
 
