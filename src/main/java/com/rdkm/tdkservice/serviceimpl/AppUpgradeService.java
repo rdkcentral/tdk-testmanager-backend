@@ -20,10 +20,12 @@ http://www.apache.org/licenses/LICENSE-2.0
 
 package com.rdkm.tdkservice.serviceimpl;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +33,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -38,10 +41,13 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -50,8 +56,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.rdkm.tdkservice.config.AppConfig;
 import com.rdkm.tdkservice.dto.AppUpgradeResponseDTO;
@@ -60,6 +69,7 @@ import com.rdkm.tdkservice.dto.DeploymentLogsDTO;
 import com.rdkm.tdkservice.dto.EntityDataDTO;
 import com.rdkm.tdkservice.dto.EntityListMetadataDTO;
 import com.rdkm.tdkservice.dto.EntityListResponseDTO;
+import com.rdkm.tdkservice.dto.WarGenerationMetadata;
 import com.rdkm.tdkservice.dto.WarUploadResponseDTO;
 import com.rdkm.tdkservice.exception.TDKServiceException;
 import com.rdkm.tdkservice.exception.UserInputException;
@@ -99,6 +109,9 @@ import com.rdkm.tdkservice.util.Constants;
 public class AppUpgradeService implements IAppUpgradeService {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AppUpgradeService.class);
+
+	private final Map<String, WarGenerationMetadata> warGenerationExecutions = new ConcurrentHashMap<>();
+
 	/**
 	 * DeviceTypeRepository bean for accessing device type data.
 	 */
@@ -1265,4 +1278,315 @@ public class AppUpgradeService implements IAppUpgradeService {
 		}
 	}
 
+	/**
+	 * Initiates WAR (Web Application Archive) generation for a specific release
+	 * tag.
+	 * 
+	 * This method validates the release tag format, creates a unique execution ID,
+	 * reads configuration properties, and sets up the necessary metadata for WAR
+	 * generation.
+	 * The actual generation process is prepared but not executed by this method.
+	 * 
+	 * @param releaseTag The release tag for which to generate the WAR file. Must
+	 *                   follow
+	 *                   the format "TDK_M" followed by exactly 3 digits (e.g.,
+	 *                   "TDK_M123").
+	 * 
+	 * @return A unique execution ID (UUID) that can be used to track the WAR
+	 *         generation process.
+	 * 
+	 * @throws UserInputException  If the releaseTag is null or doesn't match the
+	 *                             required format
+	 *                             "^TDK_M\\d{3}$"
+	 * @throws TDKServiceException If unable to read the upgrade file location from
+	 *                             the tm.config file
+	 */
+	@Override
+	public String executeWarGeneration(String releaseTag) {
+		LOGGER.info("Initiating WAR generation for release tag: {}", releaseTag);
+
+		// Validate releaseTag: must start with TDK_M followed by 3 digits
+		if (releaseTag == null || !releaseTag.matches("^TDK_M\\d{3}$")) {
+			LOGGER.error("Invalid release tag format: {}", releaseTag);
+			throw new UserInputException(
+					"Release tag must start with 'TDK_M' followed by a 3-digit number (e.g., TDK_M123)");
+		}
+
+		String executionId = UUID.randomUUID().toString();
+
+		// Read the upgrade file location from tm.config
+		String tmConfigFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
+				+ Constants.TM_CONFIG_FILE;
+		String baseUpgradeLocation = commonService.getConfigProperty(new File(tmConfigFilePath),
+				Constants.UPGRADE_FILE_LOCATION);
+		if (baseUpgradeLocation == null || baseUpgradeLocation.isEmpty()) {
+			LOGGER.error("Unable to read upgrade.fileLocation from tm.config");
+			throw new TDKServiceException("Unable to read upgrade file location from config");
+		}
+
+		String timestampDirName = "NewRelease_" + new SimpleDateFormat("yy_MM_dd_HH_mm_ss").format(new Date());
+		String upgradeDir = baseUpgradeLocation + Constants.FILE_PATH_SEPERATOR + timestampDirName;
+
+		WarGenerationMetadata metadata = new WarGenerationMetadata();
+		metadata.setExecutionId(executionId);
+		metadata.setReleaseTag(releaseTag);
+		metadata.setStatus("PENDING");
+
+		// Get script path from fileStore
+		String scriptPath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR + "war_generation.sh";
+		metadata.setScriptPath(scriptPath);
+		metadata.setUpgradeDir(upgradeDir);
+		metadata.setCreatedAt(Instant.now());
+
+		warGenerationExecutions.put(executionId, metadata);
+
+		LOGGER.info("Created WAR generation execution ID: {} for release tag: {}", executionId, releaseTag);
+		return executionId;
+	}
+
+	/**
+	 * Asynchronously streams WAR generation logs to a Server-Sent Events (SSE)
+	 * emitter.
+	 * 
+	 * This method executes a WAR generation script and streams the output in
+	 * real-time
+	 * to the client via SSE. It also writes all logs to a timestamped log file for
+	 * persistence.
+	 * 
+	 * @param executionId The unique identifier for the WAR generation execution.
+	 *                    Used to retrieve metadata from warGenerationExecutions
+	 *                    map.
+	 * @param emitter     The SseEmitter instance used to stream real-time events
+	 *                    and logs
+	 *                    to the client browser.
+	 * 
+	 * @throws IOException          If there's an error creating the log directory
+	 *                              or file,
+	 *                              or reading from the process input stream.
+	 * @throws InterruptedException If the process execution is interrupted.
+	 * 
+	 * 
+	 */
+	@Override
+	@Async
+	public void streamWarGenerationLogs(String executionId, SseEmitter emitter) {
+		WarGenerationMetadata metadata = warGenerationExecutions.get(executionId);
+		if (metadata == null) {
+			sendSseError(emitter, "Execution not found");
+			return;
+		}
+		metadata.setStatus("RUNNING");
+
+		String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+		String logDirPath = "/mnt/WarGeneration/logs";
+		String logFilePath = logDirPath + "/" + timestamp + "_WarGeneration.log";
+
+		// Ensure log directory exists
+		try {
+			Files.createDirectories(Paths.get(logDirPath));
+		} catch (IOException e) {
+			LOGGER.error("Failed to create log directory: {}", e.getMessage());
+			sendSseError(emitter, "Failed to create log directory");
+			return;
+		}
+
+		Process process = null;
+		try (BufferedWriter logFileWriter = new BufferedWriter(new FileWriter(logFilePath))) {
+			sendSseEvent(emitter, "status",
+					Map.of("message", "Starting WAR generation for release: " + metadata.getReleaseTag()));
+
+			String scriptPath = metadata.getScriptPath();
+			String releaseTag = metadata.getReleaseTag();
+			String upgradeDirPath = metadata.getUpgradeDir();
+
+			ProcessBuilder processBuilder = new ProcessBuilder("bash", scriptPath, releaseTag, upgradeDirPath)
+					.directory(new File(new File(scriptPath).getParent()))
+					.redirectErrorStream(true);
+
+			LOGGER.info("Executing command: bash {} {} {}", scriptPath, releaseTag, upgradeDirPath);
+
+			process = processBuilder.start();
+			metadata.setProcess(process);
+
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					LOGGER.debug("WAR Gen Log [{}]: {}", line);
+					sendSseEvent(emitter, "log", Map.of("message", line));
+					logFileWriter.write(line);
+					logFileWriter.newLine();
+					logFileWriter.flush();
+				}
+			}
+
+			int exitCode = process.waitFor();
+			metadata.setExitCode(exitCode);
+
+			if (exitCode == 0) {
+				metadata.setStatus("COMPLETED");
+				sendSseEvent(emitter, "complete", Map.of(
+						"status", "SUCCESS",
+						"exitCode", exitCode,
+						"message", "WAR generation completed successfully",
+						"releaseTag", metadata.getReleaseTag(),
+						"upgradeDir", metadata.getUpgradeDir()));
+				LOGGER.info("WAR generation completed successfully for execution: {}", executionId);
+			} else {
+				metadata.setStatus("FAILED");
+				sendSseEvent(emitter, "complete", Map.of(
+						"status", "FAILED",
+						"exitCode", exitCode,
+						"message", "WAR generation failed with exit code: " + exitCode,
+						"releaseTag", metadata.getReleaseTag()));
+				LOGGER.error("WAR generation failed for execution: {} with exit code: {}", executionId, exitCode);
+			}
+		} catch (InterruptedException e) {
+			handleProcessException(metadata, emitter, "INTERRUPTED", "WAR generation was interrupted", e);
+		} catch (Exception e) {
+			handleProcessException(metadata, emitter, "ERROR", "Error: " + e.getMessage(), e);
+		} finally {
+			cleanupExecution(executionId);
+			if (process != null && process.isAlive()) {
+				process.destroy();
+				try {
+					if (!process.waitFor(5, TimeUnit.SECONDS)) {
+						process.destroyForcibly();
+					}
+				} catch (InterruptedException e) {
+					process.destroyForcibly();
+				}
+			}
+			emitter.complete();
+		}
+	}
+
+	/**
+	 * Removes and cleans up metadata for a specific WAR generation execution.
+	 * 
+	 * @param executionId the unique identifier of the execution to clean up
+	 */
+	private void cleanupExecution(String executionId) {
+		WarGenerationMetadata metadata = warGenerationExecutions.remove(executionId);
+		if (metadata != null) {
+			LOGGER.info("Cleaned up metadata for execution: {}", executionId);
+		}
+	}
+
+	/**
+	 * Performs weekly cleanup of WAR generation metadata to prevent memory leaks
+	 * and
+	 * maintain optimal performance.
+	 * 
+	 */
+	@Scheduled(cron = "0 0 2 * * SUN") // Every Sunday at 2 AM
+	public void weeklyCleanup() {
+		LOGGER.info("Starting weekly cleanup of WAR generation metadata");
+
+		int cleanedCount = 0;
+
+		Iterator<Map.Entry<String, WarGenerationMetadata>> iterator = warGenerationExecutions.entrySet().iterator();
+
+		while (iterator.hasNext()) {
+			Map.Entry<String, WarGenerationMetadata> entry = iterator.next();
+			WarGenerationMetadata metadata = entry.getValue();
+
+			cleanupProcess(entry.getKey(), metadata);
+			iterator.remove();
+			cleanedCount++;
+		}
+
+		LOGGER.info("Weekly cleanup completed. Removed {} old entries", cleanedCount);
+	}
+
+	/**
+	 * Cleans up and terminates the process associated with a specific execution.
+	 * 
+	 * This method safely terminates any running process linked to the given
+	 * execution ID
+	 * by first attempting a graceful shutdown, then forcing termination if
+	 * necessary.
+	 * 
+	 * @param executionId the unique identifier for the execution whose process
+	 *                    should be cleaned up
+	 * @param metadata    the war generation metadata containing the process
+	 *                    reference to be terminateds
+	 */
+	private void cleanupProcess(String executionId, WarGenerationMetadata metadata) {
+		// Clean up any associated Process (extracted from your current implementation)
+		Process process = metadata.getProcess();
+		if (process != null && process.isAlive()) {
+			LOGGER.warn("Force terminating process for execution: {}", executionId);
+			try {
+				process.destroy();
+				if (!process.waitFor(5, TimeUnit.SECONDS)) {
+					process.destroyForcibly();
+				}
+			} catch (InterruptedException e) {
+				process.destroyForcibly();
+				Thread.currentThread().interrupt();
+			}
+		}
+	}
+
+	/**
+	 * Sends a Server-Sent Event (SSE) to the client through the provided emitter.
+	 * 
+	 * @param emitter   the SseEmitter instance used to send the event to the client
+	 * @param eventName the name of the SSE event to be sent
+	 * @param data      a map containing the event data to be transmitted as
+	 *                  key-value pairs
+	 * 
+	 * @throws IOException if an error occurs while sending the SSE event (handled
+	 *                     internally)
+	 */
+	private void sendSseEvent(SseEmitter emitter, String eventName, Map<String, Object> data) {
+		try {
+			emitter.send(SseEmitter.event().name(eventName).data(data));
+		} catch (IOException e) {
+			LOGGER.error("Error sending SSE event '{}': {}", eventName, e.getMessage());
+		}
+	}
+
+	/**
+	 * Sends an error message to the client via Server-Sent Events (SSE) and
+	 * completes the emitter.
+	 * This method creates an error event with the provided message and immediately
+	 * closes
+	 * the SSE connection after sending the error.
+	 *
+	 * @param emitter the SseEmitter instance used to send the error event to the
+	 *                client
+	 * @param message the error message to be sent to the client
+	 */
+	private void sendSseError(SseEmitter emitter, String message) {
+		sendSseEvent(emitter, "error", Map.of("message", message));
+		emitter.complete();
+	}
+
+	/**
+	 * Handles exceptions that occur during the WAR generation process by logging
+	 * the error,
+	 * updating the metadata status, and sending an SSE event to notify the client.
+	 *
+	 * @param metadata the WAR generation metadata object that tracks the execution
+	 *                 state;
+	 *                 may be null if metadata is not available
+	 * @param emitter  the Server-Sent Events emitter used to send real-time updates
+	 *                 to the client
+	 * @param status   the error status string to be set in metadata and sent to the
+	 *                 client
+	 * @param message  the error message describing what went wrong
+	 * @param e        the exception that was caught and needs to be handled
+	 */
+	private void handleProcessException(WarGenerationMetadata metadata, SseEmitter emitter, String status,
+			String message, Exception e) {
+		LOGGER.error("{} for WAR generation ID: {}", status, metadata != null ? metadata.getExecutionId() : "unknown",
+				e);
+		if (metadata != null) {
+			metadata.setStatus(status);
+			metadata.setError(message);
+		}
+		sendSseEvent(emitter, "error", Map.of("status", status, "message", message));
+
+	}
 }

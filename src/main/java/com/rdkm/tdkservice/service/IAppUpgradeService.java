@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Instant;
 
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.rdkm.tdkservice.dto.AppUpgradeResponseDTO;
 import com.rdkm.tdkservice.dto.DeploymentLogsDTO;
@@ -112,5 +113,23 @@ public interface IAppUpgradeService {
 	 * @return Response containing log content and details
 	 */
 	DeploymentLogsDTO getLatestDeploymentLogs();
+
+	/**
+	 * Executes the WAR generation script (clone_repo.sh) with the provided release
+	 * tag
+	 * and returns an execution ID for tracking
+	 * 
+	 * @param releaseTag the release tag to pass to the clone script
+	 * @return execution ID for tracking the script execution
+	 */
+	String executeWarGeneration(String releaseTag);
+
+	/**
+	 * Streams WAR generation logs via Server-Sent Events
+	 * 
+	 * @param executionId the execution ID to stream logs for
+	 * @param emitter     the SSE emitter for streaming
+	 */
+	void streamWarGenerationLogs(String executionId, SseEmitter emitter);
 
 }
