@@ -132,4 +132,10 @@ public interface IAppUpgradeService {
 	 */
 	void streamWarGenerationLogs(String executionId, SseEmitter emitter);
 
+	/**
+	 * Performs weekly cleanup of WAR generation metadata
+	 * This method is executed every Sunday at 2 AM via scheduled task
+	 */
+	void weeklyCleanup();
+
 }
