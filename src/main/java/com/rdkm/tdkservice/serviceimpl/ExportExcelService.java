@@ -1349,7 +1349,12 @@ public class ExportExcelService implements IExportExcelService {
 				resultData.put("moduleName", moduleName);
 				resultData.put("executionResult", prioritizedResult);
 				resultData.put("scriptName", prioritizedResult.getScript());
-				resultData.put("executed", prioritizedResult.getExecution().getResult());
+				if (prioritizedResult.getResult().equals(ExecutionResultStatus.SUCCESS)
+						|| prioritizedResult.getResult().equals(ExecutionResultStatus.FAILURE)) {
+					resultData.put("executed", "Yes");
+				} else {
+					resultData.put("executed", "No");
+				}
 				resultData.put("status", prioritizedResult.getResult());
 				resultData.put("executedOn",
 						Optional.ofNullable(formatExecutionDateToUTC(prioritizedResult.getDateOfExecution().toString()))

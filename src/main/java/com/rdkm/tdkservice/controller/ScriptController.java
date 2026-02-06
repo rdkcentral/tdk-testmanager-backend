@@ -39,12 +39,14 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.rdkm.tdkservice.dto.ScriptBulkDownloadDTO;
 import com.rdkm.tdkservice.dto.ScriptCreateDTO;
 import com.rdkm.tdkservice.dto.ScriptDTO;
 import com.rdkm.tdkservice.dto.ScriptDetailsResponse;
@@ -572,8 +574,7 @@ public class ScriptController {
 		}
 		return ResponseEntity.ok()
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + category + "_scripts_markdown.zip")
-				.contentType(MediaType.parseMediaType("application/zip"))
-				.body(new InputStreamResource(zipStream));
+				.contentType(MediaType.parseMediaType("application/zip")).body(new InputStreamResource(zipStream));
 	}
 
 	/**
@@ -594,7 +595,91 @@ public class ScriptController {
 		}
 		return ResponseEntity.ok()
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=all_scripts_markdown.zip")
-				.contentType(MediaType.parseMediaType("application/zip"))
-				.body(new InputStreamResource(zipStream));
+				.contentType(MediaType.parseMediaType("application/zip")).body(new InputStreamResource(zipStream));
+	}
+
+	/**
+	 * This method is used to download multiple scripts as a ZIP or TAR file. Each
+	 * script will be in its own folder containing both Python and XML files.
+	 * 
+	 * @param scriptBulkDownloadDTO - the DTO containing list of script names and
+	 *                              format
+	 * @return ResponseEntity - the ZIP or TAR file containing all scripts
+	 */
+	@Operation(summary = "Download Multiple Scripts as ZIP or TAR", description = "Download multiple scripts as a ZIP or TAR.GZ file. Each script will be in its own folder with Python and XML files. Format can be 'zip' or 'tar'.")
+	@ApiResponse(responseCode = "200", description = "Scripts downloaded successfully")
+	@ApiResponse(responseCode = "400", description = "Bad request - empty script list or invalid format")
+	@ApiResponse(responseCode = "500", description = "Error in generating archive file")
+	@PostMapping("/downloadBulkScripts")
+	public ResponseEntity<?> downloadBulkScripts(@Valid @RequestBody ScriptBulkDownloadDTO scriptBulkDownloadDTO) {
+
+		String format = scriptBulkDownloadDTO.getFormat() != null ? scriptBulkDownloadDTO.getFormat().toLowerCase()
+				: "zip";
+
+		LOGGER.info("Received request to download {} scripts as {} format",
+				scriptBulkDownloadDTO.getScriptNames().size(), format);
+
+		if (scriptBulkDownloadDTO.getScriptNames() == null || scriptBulkDownloadDTO.getScriptNames().isEmpty()) {
+			throw new TDKServiceException("Script names list cannot be empty");
+		}
+
+		byte[] archiveContent;
+		String filename;
+		String contentType;
+
+		if ("tar".equals(format)) {
+			archiveContent = scriptService.generateBulkScriptTarGz(scriptBulkDownloadDTO.getScriptNames());
+			filename = "listofscripts.tar.gz";
+			contentType = "application/gzip";
+		} else {
+			archiveContent = scriptService.generateBulkScriptZip(scriptBulkDownloadDTO.getScriptNames());
+			filename = "listofscripts.zip";
+			contentType = "application/zip";
+		}
+
+		if (archiveContent == null || archiveContent.length == 0) {
+			throw new TDKServiceException("No scripts were packaged");
+		}
+
+		LOGGER.info("Successfully generated bulk script archive: {}", filename);
+
+		return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + filename)
+				.contentType(MediaType.parseMediaType(contentType)).body(archiveContent);
+	}
+
+	/**
+	 * Upload and process bulk scripts from ZIP or TAR archive. Extracts scripts and
+	 * saves them to the system.
+	 * 
+	 * @param file - the ZIP or TAR.GZ file containing scripts
+	 * @return ResponseEntity - the response with upload status
+	 */
+	@Operation(summary = "Upload Bulk Scripts Archive", description = "Upload and process ZIP or TAR.GZ file containing multiple scripts. Each script should be in its own folder with Python and XML files.")
+	@ApiResponse(responseCode = "200", description = "Scripts uploaded successfully")
+	@ApiResponse(responseCode = "400", description = "Invalid file format or structure")
+	@ApiResponse(responseCode = "500", description = "Error processing archive")
+	@PostMapping("/uploadBulkScripts")
+	public ResponseEntity<Response> uploadBulkScripts(@RequestParam("file") MultipartFile file) {
+		LOGGER.info("Received bulk script upload request: {}", file.getOriginalFilename());
+
+		if (file == null || file.isEmpty()) {
+			throw new TDKServiceException("Upload file cannot be empty");
+		}
+
+		String filename = file.getOriginalFilename();
+		if (filename == null || (!filename.toLowerCase().endsWith(".zip") && !filename.toLowerCase().endsWith(".tar.gz")
+				&& !filename.toLowerCase().endsWith(".tar"))) {
+			throw new TDKServiceException("File must be a ZIP or TAR archive");
+		}
+
+		boolean uploadSuccess = scriptService.processBulkScriptArchive(file);
+
+		if (uploadSuccess) {
+			LOGGER.info("Bulk scripts uploaded successfully from: {}", filename);
+			return ResponseUtils.getSuccessResponse("Bulk scripts uploaded successfully");
+		} else {
+			throw new TDKServiceException("Failed to process bulk script archive");
+		}
+
 	}
 }

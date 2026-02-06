@@ -23,6 +23,7 @@ package com.rdkm.tdkservice.serviceimpl;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,7 +36,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -56,6 +59,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2144,4 +2148,532 @@ public class ScriptService implements IScriptService {
 		return false;
 	}
 
+	
+	/**
+	 * Generate a ZIP file containing multiple scripts. Each script will be in its
+	 * own folder with both Python and XML files.
+	 * 
+	 * @param scriptNames - the list of script names
+	 * @return - the ZIP file as a byte array
+	 */
+	@Override
+	public byte[] generateBulkScriptZip(List<String> scriptNames) {
+		LOGGER.info("Generating bulk script ZIP for {} scripts", scriptNames.size());
+
+		if (scriptNames == null || scriptNames.isEmpty()) {
+			throw new UserInputException("Script names list cannot be empty");
+		}
+
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+		try (ZipOutputStream zipOutputStream = new ZipOutputStream(byteArrayOutputStream)) {
+			int foundScriptsCount = 0;
+			for (String scriptName : scriptNames) {
+				try {
+					LOGGER.info("Processing script: {}", scriptName);
+
+					// Get script from database
+					Script script = scriptRepository.findByName(scriptName);
+					if (script == null) {
+						LOGGER.warn("Script not found: {}. Skipping...", scriptName);
+						continue;
+					}
+					foundScriptsCount++;
+					// Create folder for this script inside the ZIP
+					String scriptFolder = scriptName + "/";
+
+					// Add XML file
+					String xmlContent = generateTestCaseXml(scriptName);
+					ZipEntry xmlEntry = new ZipEntry(scriptFolder + scriptName + Constants.XML_FILE_EXTENSION);
+					zipOutputStream.putNextEntry(xmlEntry);
+					zipOutputStream.write(xmlContent.getBytes(StandardCharsets.UTF_8));
+					zipOutputStream.closeEntry();
+
+					// Add Python file
+					File pythonFile = getPythonFile(scriptName);
+					if (pythonFile.exists()) {
+						ZipEntry pythonEntry = new ZipEntry(scriptFolder + pythonFile.getName());
+						zipOutputStream.putNextEntry(pythonEntry);
+						Files.copy(pythonFile.toPath(), zipOutputStream);
+						zipOutputStream.closeEntry();
+					} else {
+						LOGGER.warn("Python file not found for script: {}", scriptName);
+					}
+
+					LOGGER.info("Successfully added script {} to ZIP", scriptName);
+
+				} catch (Exception e) {
+					LOGGER.error("Error processing script {}: {}", scriptName, e.getMessage());
+					// Continue with next script instead of failing entire operation
+				}
+			}
+			if (foundScriptsCount == 0) {
+				LOGGER.error("No scripts found in the database for the provided script names: {}", scriptNames);
+				throw new UserInputException("No scripts found in the database for the provided script names");
+			}
+			zipOutputStream.finish();
+			LOGGER.info("Successfully generated bulk script ZIP");
+
+		} catch (IOException e) {
+			LOGGER.error("Error creating bulk script ZIP: {}", e.getMessage());
+			throw new TDKServiceException("Error creating bulk script ZIP: " + e.getMessage());
+		}
+
+		return byteArrayOutputStream.toByteArray();
+	}
+
+	/**
+	 * Generate a TAR.GZ file containing multiple scripts. Each script will be in
+	 * its own folder with both Python and XML files.
+	 * 
+	 * @param scriptNames - the list of script names
+	 * @return - the TAR.GZ file as a byte array
+	 */
+	@Override
+	public byte[] generateBulkScriptTarGz(List<String> scriptNames) {
+		LOGGER.info("Generating bulk script TAR.GZ for {} scripts", scriptNames.size());
+
+		if (scriptNames == null || scriptNames.isEmpty()) {
+			throw new UserInputException("Script names list cannot be empty");
+		}
+
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+		try (GzipCompressorOutputStream gzipOutputStream = new GzipCompressorOutputStream(byteArrayOutputStream);
+				TarArchiveOutputStream tarOutputStream = new TarArchiveOutputStream(gzipOutputStream)) {
+
+			// Set to support long file names and set proper format
+			tarOutputStream.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+			tarOutputStream.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+
+			int foundScriptsCount = 0;
+
+			for (String scriptName : scriptNames) {
+				try {
+					LOGGER.info("Processing script: {}", scriptName);
+
+					// Get script from database
+					Script script = scriptRepository.findByName(scriptName);
+					if (script == null) {
+						LOGGER.warn("Script not found: {}. Skipping...", scriptName);
+						continue;
+					}
+					foundScriptsCount++;
+					// Create folder for this script inside the TAR
+					String scriptFolder = scriptName + "/";
+
+					// Add XML file
+					String xmlContent = generateTestCaseXml(scriptName);
+					byte[] xmlBytes = xmlContent.getBytes(StandardCharsets.UTF_8);
+
+					String xmlFileName = scriptFolder + scriptName + Constants.XML_FILE_EXTENSION;
+					TarArchiveEntry xmlEntry = new TarArchiveEntry(xmlFileName);
+					xmlEntry.setSize(xmlBytes.length);
+					xmlEntry.setModTime(System.currentTimeMillis());
+					tarOutputStream.putArchiveEntry(xmlEntry);
+					tarOutputStream.write(xmlBytes);
+					tarOutputStream.closeArchiveEntry();
+
+					// Add Python file
+					File pythonFile = getPythonFile(scriptName);
+					if (pythonFile.exists()) {
+						byte[] pythonBytes = Files.readAllBytes(pythonFile.toPath());
+						String pythonFileName = scriptFolder + pythonFile.getName();
+
+						TarArchiveEntry pythonEntry = new TarArchiveEntry(pythonFileName);
+						pythonEntry.setSize(pythonBytes.length);
+						pythonEntry.setModTime(pythonFile.lastModified());
+						tarOutputStream.putArchiveEntry(pythonEntry);
+						tarOutputStream.write(pythonBytes);
+						tarOutputStream.closeArchiveEntry();
+					} else {
+						LOGGER.warn("Python file not found for script: {}", scriptName);
+					}
+
+					LOGGER.info("Successfully added script {} to TAR.GZ", scriptName);
+
+				} catch (Exception e) {
+					LOGGER.error("Error processing script {}: {}", scriptName, e.getMessage());
+					// Continue with next script instead of failing entire operation
+				}
+			}
+			if (foundScriptsCount == 0) {
+				LOGGER.error("No scripts found in the database for the provided script names: {}", scriptNames);
+				throw new UserInputException("No scripts found in the database for the provided script names");
+			}
+			tarOutputStream.finish();
+			LOGGER.info("Successfully generated bulk script TAR.GZ");
+
+		} catch (IOException e) {
+			LOGGER.error("Error creating bulk script TAR.GZ: {}", e.getMessage());
+			throw new TDKServiceException("Error creating bulk script TAR.GZ: " + e.getMessage());
+		}
+
+		return byteArrayOutputStream.toByteArray();
+	}
+
+	/**
+	 * Process a bulk script archive (ZIP or TAR.GZ) and extract scripts for
+	 * processing.
+	 * 
+	 * @param archiveFile the uploaded archive file
+	 * @return true if at least one script was processed successfully, false
+	 *         otherwise
+	 */
+	@Override
+	public boolean processBulkScriptArchive(MultipartFile archiveFile) {
+		LOGGER.info("Processing bulk script archive: {}", archiveFile.getOriginalFilename());
+
+		String filename = archiveFile.getOriginalFilename();
+		if (filename == null) {
+			throw new TDKServiceException("Archive filename cannot be null");
+		}
+
+		try {
+			if (filename.toLowerCase().endsWith(".zip")) {
+				return processBulkZipArchive(archiveFile);
+			} else if (filename.toLowerCase().endsWith(".tar.gz") || filename.toLowerCase().endsWith(".tar")) {
+				return processBulkTarArchive(archiveFile);
+			} else {
+				throw new TDKServiceException("Unsupported archive format: " + filename);
+			}
+		} catch (Exception e) {
+			LOGGER.error("Error processing bulk archive: {}", e.getMessage());
+			throw new TDKServiceException("Failed to process archive: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Update ZIP processing to use the Map approach
+	 * 
+	 * @param zipFile the uploaded ZIP file
+	 * @return true if at least one script was processed successfully, false
+	 *         otherwise
+	 * @throws IOException if an error occurs while processing the ZIP file
+	 */
+	private boolean processBulkZipArchive(MultipartFile zipFile) throws IOException {
+		LOGGER.info("Processing ZIP archive for bulk scripts");
+
+		int processedScripts = 0;
+		File tempZipFile = createTempFile(zipFile);
+
+		try (ZipFile zip = new ZipFile(tempZipFile)) {
+			Map<String, Map<String, Object>> scriptDataMap = extractScriptsFromZipAsMap(zip);
+			processedScripts = processExtractedScriptsFromMap(scriptDataMap);
+
+			LOGGER.info("Processed {} out of {} scripts from ZIP", processedScripts, scriptDataMap.size());
+			return processedScripts > 0;
+
+		} finally {
+			tempZipFile.delete();
+		}
+	}
+
+	/**
+	 * Extract scripts from ZIP file using Map approach
+	 * 
+	 * @param zip the ZIP file to extract scripts from
+	 * @return a map containing script data organized by script name
+	 * @throws IOException if an error occurs while reading the ZIP file
+	 */
+	private Map<String, Map<String, Object>> extractScriptsFromZipAsMap(ZipFile zip) throws IOException {
+		Map<String, Map<String, Object>> scriptDataMap = new HashMap<>();
+
+		Enumeration<? extends ZipEntry> entries = zip.entries();
+		while (entries.hasMoreElements()) {
+			ZipEntry entry = entries.nextElement();
+
+			if (entry.isDirectory()) {
+				continue;
+			}
+
+			extractZipEntryDataAsMap(zip, entry, scriptDataMap);
+		}
+
+		LOGGER.info("Extracted {} scripts from ZIP archive", scriptDataMap.size());
+		return scriptDataMap;
+	}
+
+	/**
+	 * Processes a single ZIP entry and extracts script-related data into the
+	 * provided map.
+	 * 
+	 * This method reads the content of a ZIP entry and organizes it by script
+	 * name.
+	 * It handles XML and Python files specifically, storing their content and
+	 * metadata
+	 * in the provided script data map.
+	 * 
+	 * @param zip           the ZIP file to read entries from
+	 * @param entry         the current ZIP entry being processed
+	 * @param scriptDataMap a map that stores script data organized by script name,
+	 *                      where each script can contain xmlContent, pythonContent,
+	 *                      pythonFileName, and scriptName
+	 */
+	private void extractZipEntryDataAsMap(ZipFile zip, ZipEntry entry, Map<String, Map<String, Object>> scriptDataMap) {
+		try {
+			String entryPath = entry.getName();
+			String[] pathParts = entryPath.split("/");
+
+			if (pathParts.length < 2) {
+				return; // Skip files not in folders
+			}
+
+			String scriptName = pathParts[0];
+			String fileName = pathParts[pathParts.length - 1];
+
+			Map<String, Object> scriptData = scriptDataMap.computeIfAbsent(scriptName, k -> new HashMap<>());
+			scriptData.put("scriptName", scriptName);
+
+			try (InputStream entryStream = zip.getInputStream(entry)) {
+				if (fileName.endsWith(Constants.XML_FILE_EXTENSION)) {
+					scriptData.put("xmlContent", entryStream.readAllBytes());
+				} else if (fileName.endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+					scriptData.put("pythonContent", entryStream.readAllBytes());
+					scriptData.put("pythonFileName", fileName);
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.warn("Error processing ZIP entry {}: {}", entry.getName(), e.getMessage());
+		}
+	}
+
+	/**
+	 * Update TAR processing to use the same Map approach
+	 * 
+	 * @param tarFile the uploaded TAR file
+	 * @return true if at least one script was processed successfully, false
+	 *         otherwise
+	 * @throws IOException if an error occurs while processing the TAR file
+	 */
+	private boolean processBulkTarArchive(MultipartFile tarFile) throws IOException {
+		LOGGER.info("Processing TAR archive for bulk scripts");
+
+		int processedScripts = 0;
+		File tempTarFile = createTempFile(tarFile);
+
+		try {
+
+			Map<String, Map<String, Object>> scriptDataMap = extractScriptsFromTar(
+					tempTarFile, tarFile.getOriginalFilename(), tarFile.getContentType());
+			processedScripts = processExtractedScriptsFromMap(scriptDataMap);
+
+			LOGGER.info("Processed {} out of {} scripts from TAR", processedScripts, scriptDataMap.size());
+			return processedScripts > 0;
+
+		} catch (Exception e) {
+			LOGGER.error("Error processing TAR archive: {}", e.getMessage(), e);
+			throw new TDKServiceException("Error processing TAR archive: " + e.getMessage());
+		} finally {
+			tempTarFile.delete();
+		}
+	}
+
+	/**
+	 * Extract scripts from TAR file using Map approach
+	 * 
+	 * @param tarFile          the TAR file to extract scripts from
+	 * @param originalFilename the original filename of the uploaded file
+	 * @param contentType      the content type of the uploaded file
+	 * @return a map containing script data organized by script name
+	 * @throws IOException if an error occurs while reading the TAR file
+	 */
+	private Map<String, Map<String, Object>> extractScriptsFromTar(File tarFile, String originalFilename,
+			String contentType) throws IOException {
+		Map<String, Map<String, Object>> scriptDataMap = new HashMap<>();
+
+		try (FileInputStream fileInputStream = new FileInputStream(tarFile);
+				InputStream inputStream = isGzipContent(originalFilename, contentType)
+						? new GzipCompressorInputStream(fileInputStream)
+						: fileInputStream;
+				TarArchiveInputStream tarInputStream = new TarArchiveInputStream(inputStream)) {
+
+			TarArchiveEntry entry;
+			while ((entry = tarInputStream.getNextTarEntry()) != null) {
+				if (entry.isFile()) {
+					processTarEntry(tarInputStream, entry, scriptDataMap);
+				}
+			}
+
+			LOGGER.info("Extracted {} scripts from TAR archive", scriptDataMap.size());
+			return scriptDataMap;
+		}
+	}
+
+	/**
+	 * Determines if the content is GZIP compressed based on filename and content
+	 * type.
+	 * 
+	 * @param originalFilename the original filename of the uploaded file
+	 * @param contentType      the content type of the uploaded file
+	 * @return true if the content is GZIP compressed, false otherwise
+	 */
+	private boolean isGzipContent(String originalFilename, String contentType) {
+		// Check content type
+		if (contentType != null && (contentType.contains("gzip") || contentType.contains("application/gzip"))) {
+			return true;
+		}
+
+		// Check filename extension
+		if (originalFilename != null) {
+			String fileName = originalFilename.toLowerCase();
+			return fileName.endsWith(".gz") || fileName.endsWith(".tgz");
+		}
+
+		return false;
+	}
+
+	/**
+	 * Processes a single entry from a TAR archive and extracts script-related data.
+	 * 
+	 * This method reads the content of a TAR archive entry and organizes it by
+	 * script name.
+	 * It handles XML and Python files specifically, storing their content and
+	 * metadata
+	 * in the provided script data map.
+	 * 
+	 * @param tarInputStream the TAR archive input stream to read entry content from
+	 * @param entry          the current TAR archive entry being processed
+	 * @param scriptDataMap  a map that stores script data organized by script name,
+	 *                       where each script can contain xmlContent,
+	 *                       pythonContent,
+	 *                       pythonFileName, and scriptName
+	 * @throws IOException if an error occurs while reading the entry content from
+	 *                     the stream
+	 * 
+	 */
+	private void processTarEntry(TarArchiveInputStream tarInputStream, TarArchiveEntry entry,
+			Map<String, Map<String, Object>> scriptDataMap) throws IOException {
+		String entryPath = entry.getName();
+		String[] pathParts = entryPath.split("/");
+
+		if (pathParts.length < 2) {
+			return; // Skip files not in folders
+		}
+
+		String scriptName = pathParts[0];
+		String fileName = pathParts[pathParts.length - 1];
+
+		Map<String, Object> scriptData = scriptDataMap.computeIfAbsent(scriptName, k -> new HashMap<>());
+		scriptData.put("scriptName", scriptName);
+
+		// Read entry content
+		byte[] content = new byte[(int) entry.getSize()];
+		int totalRead = 0;
+		while (totalRead < content.length) {
+			int bytesRead = tarInputStream.read(content, totalRead, content.length - totalRead);
+			if (bytesRead == -1) {
+				break;
+			}
+			totalRead += bytesRead;
+		}
+
+		if (fileName.endsWith(Constants.XML_FILE_EXTENSION)) {
+			scriptData.put("xmlContent", content);
+		} else if (fileName.endsWith(Constants.PYTHON_FILE_EXTENSION)) {
+			scriptData.put("pythonContent", content);
+			scriptData.put("pythonFileName", fileName);
+		}
+	}
+
+	/**
+	 * Creates a temporary file from the provided MultipartFile.
+	 * The temporary file is created with a prefix "bulk_upload_" and suffix ".tmp".
+	 * The file is automatically marked for deletion when the JVM exits.
+	 *
+	 * @param multipartFile the MultipartFile to be written to the temporary file
+	 * @return a File object representing the created temporary file
+	 */
+	private File createTempFile(MultipartFile multipartFile) throws IOException {
+		File tempFile = File.createTempFile("bulk_upload_", ".tmp");
+		multipartFile.transferTo(tempFile);
+		tempFile.deleteOnExit();
+		return tempFile;
+	}
+
+	/**
+	 * Processes multiple script data entries extracted from a map structure.
+	 * 
+	 * @param scriptDataMap a map containing script data where each value represents
+	 *                      a map of script attributes including "scriptName"
+	 * @return the total number of scripts that were successfully processed
+	 *
+	 */
+	private int processExtractedScriptsFromMap(Map<String, Map<String, Object>> scriptDataMap) {
+		int processedCount = 0;
+
+		for (Map<String, Object> scriptData : scriptDataMap.values()) {
+			try {
+				if (processIndividualScriptFromMap(scriptData)) {
+					processedCount++;
+					String scriptName = (String) scriptData.get("scriptName");
+					LOGGER.info("Successfully processed script: {}", scriptName);
+				}
+			} catch (Exception e) {
+				String scriptName = (String) scriptData.get("scriptName");
+				LOGGER.warn("Failed to process script '{}': {}", scriptName, e.getMessage());
+			}
+		}
+
+		return processedCount;
+	}
+
+	/**
+	 * Processes an individual script from a map containing script data and saves or
+	 * updates it in the repository.
+	 * 
+	 * This method extracts script information from the provided map, validates the
+	 * required data,
+	 * and either creates a new script or updates an existing one based on whether a
+	 * script with
+	 * the same name already exists in the repository.
+	 * 
+	 * @param scriptData A map containing script data with the following expected
+	 *                   keys:
+	 *                   - "scriptName" (String): The name of the script
+	 *                   - "xmlContent" (byte[]): The XML content of the script
+	 *                   - "pythonContent" (byte[]): The Python script content as
+	 *                   bytes
+	 *                   - "pythonFileName" (String): The filename for the Python
+	 *                   script
+	 * 
+	 * @return true if the script was successfully processed and saved/updated,
+	 *         false otherwise.
+	 *         Returns false if any required data is missing or if an error occurs
+	 *         during processing.
+	 */
+	private boolean processIndividualScriptFromMap(Map<String, Object> scriptData) {
+		String scriptName = (String) scriptData.get("scriptName");
+		byte[] xmlContent = (byte[]) scriptData.get("xmlContent");
+		byte[] pythonContent = (byte[]) scriptData.get("pythonContent");
+		String pythonFileName = (String) scriptData.get("pythonFileName");
+
+		if (xmlContent == null || pythonContent == null || pythonFileName == null) {
+			LOGGER.warn("Incomplete script data for: {}", scriptName);
+			return false;
+		}
+
+		try {
+			// Reuse existing methods
+			ScriptCreateDTO scriptCreateDTO = convertXmlToScriptCreateDTO(
+					new ByteArrayInputStream(xmlContent));
+
+			MultipartFile pythonFile = convertScriptFileToMultipartFile(
+					new ByteArrayInputStream(pythonContent),
+					pythonFileName);
+
+			// Check if script exists and save/update
+			Script existingScript = scriptRepository.findByName(scriptName);
+			if (existingScript != null) {
+				ScriptDTO scriptDTO = MapperUtils.convertToScriptDTOForXMLUpdate(scriptCreateDTO, existingScript);
+				return updateScriptFromXML(pythonFile, scriptDTO, existingScript);
+			} else {
+				return saveScript(pythonFile, scriptCreateDTO);
+			}
+
+		} catch (Exception e) {
+			LOGGER.error("Error processing script '{}': {}", scriptName, e.getMessage());
+			return false;
+		}
+	}
 }

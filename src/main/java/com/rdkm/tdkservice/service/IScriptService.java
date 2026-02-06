@@ -227,4 +227,32 @@ public interface IScriptService {
 	 * @return ByteArrayInputStream containing the ZIP
 	 */
 	ByteArrayInputStream downloadMarkdownByCategoryZip(String category);
+	
+	/**
+	 * This method is used to generate a bulk download of multiple scripts as a
+	 * TAR.GZ file.
+	 * Each script will be in its own folder containing both Python and XML files.
+	 * 
+	 * @param scriptNames - the list of script names to download
+	 * @return byte array - the TAR.GZ file containing all scripts
+	 */
+	byte[] generateBulkScriptTarGz(List<String> scriptNames);
+
+	/**
+	 * This method is used to generate a bulk download of multiple scripts as a ZIP
+	 * file.
+	 * Each script will be in its own folder containing both Python and XML files.
+	 * 
+	 * @param scriptNames - the list of script names to download
+	 * @return byte array - the ZIP file containing all scripts
+	 */
+	byte[] generateBulkScriptZip(List<String> scriptNames);
+
+	/**
+	 * Process bulk script archive (ZIP or TAR) and save scripts to the system
+	 * 
+	 * @param archiveFile - the archive file containing scripts
+	 * @return boolean - true if processed successfully
+	 */
+	boolean processBulkScriptArchive(MultipartFile archiveFile);
 }
