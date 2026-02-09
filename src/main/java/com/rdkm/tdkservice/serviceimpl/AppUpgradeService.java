@@ -1446,6 +1446,7 @@ public class AppUpgradeService implements IAppUpgradeService {
 			handleProcessException(metadata, emitter, "ERROR", "Error: " + e.getMessage(), e);
 		} finally {
 			cleanupExecution(executionId);
+			emitter.complete();
 			if (process != null && process.isAlive()) {
 				process.destroy();
 				try {
@@ -1456,7 +1457,7 @@ public class AppUpgradeService implements IAppUpgradeService {
 					process.destroyForcibly();
 				}
 			}
-			emitter.complete();
+
 		}
 	}
 
