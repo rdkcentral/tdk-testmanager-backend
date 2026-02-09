@@ -24,6 +24,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +43,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.rdkm.tdkservice.dto.AppUpgradeResponseDTO;
 import com.rdkm.tdkservice.dto.DeploymentLogsDTO;
@@ -70,6 +73,8 @@ import com.rdkm.tdkservice.service.ILiquibaseService;
 public class AppUpGradeController {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AppUpGradeController.class);
+
+	private final Map<String, SseEmitter> activeEmitters = new ConcurrentHashMap<>();
 	/**
 	 * AppUpgradeService bean for exporting device type changes to SQL.
 	 */
@@ -315,5 +320,72 @@ public class AppUpGradeController {
 			LOGGER.error("Error during data recovery: {}", e.getMessage(), e);
 			throw new TDKServiceException("Data recovery failed, Please check the logs");
 		}
+	}
+
+	/**
+	 * Executes the WAR generation process with the specified release tag.
+	 * 
+	 * This endpoint initiates the WAR generation script execution asynchronously
+	 * and returns
+	 * an execution ID that can be used to track the progress of the generation
+	 * process.
+	 * 
+	 * @param releaseTag the release tag to be used for WAR generation (required)
+	 * @return ResponseEntity containing DataResponse with execution details
+	 *         including:
+	 *         - executionId: unique identifier for tracking the generation process
+	 *         - message: confirmation message about script execution
+	 *         - status: current status of the execution (initially "RUNNING")
+	 */
+	@PostMapping("/war-generation")
+	@Operation(summary = "Execute WAR generation script with release tag")
+	@ApiResponse(responseCode = "200", description = "WAR generation started successfully")
+	@ApiResponse(responseCode = "400", description = "Invalid input")
+	@ApiResponse(responseCode = "500", description = "Internal Server Error")
+	public ResponseEntity<DataResponse> executeWarGeneration(@RequestParam(required = true) String releaseTag) {
+		LOGGER.info("Starting WAR generation with release tag: {}", releaseTag);
+		String executionId = appUpgradeService.executeWarGeneration(releaseTag);
+		Map<String, String> response = Map.of(
+				"executionId", executionId,
+				"message", "WAR generation script execution started",
+				"status", "RUNNING");
+		return ResponseUtils.getSuccessDataResponse("WAR generation started successfully", response);
+
+	}
+
+	/**
+	 * Streams WAR generation logs in real-time using Server-Sent Events (SSE).
+	 * 
+	 * This endpoint establishes a persistent connection to stream log messages
+	 * for a specific WAR generation execution. The connection automatically
+	 * handles cleanup on completion, timeout, or error scenarios.
+	 * 
+	 * @param executionId The unique identifier for the WAR generation execution
+	 * @return SseEmitter configured for streaming log messages with a 5-minute
+	 *         timeout
+	 */
+	@GetMapping(value = "/war-generation/logs", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+	@Operation(summary = "Stream WAR generation logs")
+	@ApiResponse(responseCode = "200", description = "Log streaming started")
+	@ApiResponse(responseCode = "404", description = "Execution not found")
+	public SseEmitter streamWarGenerationLogs(@RequestParam String executionId) {
+		LOGGER.info("Starting log stream for WAR generation execution ID: {}", executionId);
+		SseEmitter emitter = new SseEmitter(300000L);
+		activeEmitters.put(executionId, emitter);
+		emitter.onCompletion(() -> {
+			LOGGER.info("SSE connection completed for execution: {}", executionId);
+			activeEmitters.remove(executionId);
+		});
+		emitter.onTimeout(() -> {
+			LOGGER.warn("SSE connection timeout for execution: {}", executionId);
+			activeEmitters.remove(executionId);
+			emitter.complete();
+		});
+		emitter.onError((ex) -> {
+			LOGGER.error("SSE connection error for execution: {}", executionId, ex);
+			activeEmitters.remove(executionId);
+		});
+		appUpgradeService.streamWarGenerationLogs(executionId, emitter);
+		return emitter;
 	}
 }
