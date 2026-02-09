@@ -73,6 +73,7 @@ import com.rdkm.tdkservice.service.IExecutionService;
 import com.rdkm.tdkservice.service.IExportExcelService;
 import com.rdkm.tdkservice.service.IFileService;
 import com.rdkm.tdkservice.util.ResponseUtils;
+import jakarta.servlet.http.HttpServletRequest;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -1507,6 +1508,56 @@ public class ExecutionController {
 			return ResponseUtils.getSuccessDataResponse("Executions fetched successfully", executions);
 		} else {
 			return ResponseUtils.getSuccessDataResponse("No executions found for status: " + status, null);
+		}
+	}
+
+	/**
+	 * This method is used to upload an image file for the screencapture scripts.
+	 * Supports both multipart form data (browser/curl -F) and raw binary POST (C++ clients).
+	 * 
+	 * @param request  the HTTP servlet request
+	 * @param image    the image file to upload (optional for raw POST)
+	 * @param filename the name to save the file as (defaults to TDKScreenShot.png)
+	 * @return ResponseEntity<Response> with the status of the upload
+	 */
+	@Operation(summary = "Upload Image")
+	@ApiResponses(value = { 
+			@ApiResponse(responseCode = "200", description = "Image uploaded successfully"),
+			@ApiResponse(responseCode = "400", description = "Invalid image file/Image file is missing"),
+			@ApiResponse(responseCode = "500", description = "Failed to upload image") })
+	@PostMapping("/uploadImage")
+	public ResponseEntity<Response> uploadImage(
+			HttpServletRequest request,
+			@RequestParam(required = false) MultipartFile image,
+			@RequestParam(defaultValue = "TDKScreenShot.png") String fileName) {
+		
+		LOGGER.info("Starting image upload: {}", fileName);
+		boolean result;
+		
+		String contentType = request.getContentType();
+		
+		if (contentType != null && contentType.toLowerCase().startsWith("multipart/")) {
+			// Handle multipart form data (browser / curl -F)
+			if (image == null || image.isEmpty()) {
+				LOGGER.error("No image file uploaded in multipart request");
+				throw new UserInputException("No image file uploaded");
+			}
+			result = fileService.uploadImage(image, fileName);
+		} else {
+			// Handle raw binary POST (C++ clients sending raw bytes) when called from the device
+			try {
+				result = fileService.uploadImageFromStream(request.getInputStream(), fileName);
+			} catch (IOException e) {
+				LOGGER.error("Failed to read input stream: {}", e.getMessage());
+				throw new TDKServiceException("Failed to read upload data: " + e.getMessage());
+			}
+		}
+		
+		if (result) {
+			return ResponseUtils.getSuccessResponse("Image uploaded successfully");
+		} else {
+			LOGGER.error("Image upload failed for file: {}", fileName);
+			throw new TDKServiceException("Failed to upload image");
 		}
 	}
 
