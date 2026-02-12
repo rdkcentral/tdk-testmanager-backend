@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -66,11 +66,9 @@ public class DeviceController {
 	 * Handles the creation of a new device.
 	 * <p>
 	 * Receives a {@link DeviceCreateDTO} object in the request body, logs the
-	 * device creation attempt,
-	 * and delegates the creation process to the {@code deviceService}. If the
-	 * device is created successfully,
-	 * returns a 201 Created response. Otherwise, throws a
-	 * {@link TDKCIServiceException}.
+	 * device creation attempt, and delegates the creation process to the
+	 * {@code deviceService}. If the device is created successfully, returns a 201
+	 * Created response. Otherwise, throws a {@link TDKCIServiceException}.
 	 * </p>
 	 *
 	 * @param deviceRequest the device creation request payload
@@ -100,8 +98,7 @@ public class DeviceController {
 	 * </p>
 	 *
 	 * @return ResponseEntity containing a DataResponse with the list of DeviceDTO
-	 *         objects if found,
-	 *         or a message indicating no devices were found.
+	 *         objects if found, or a message indicating no devices were found.
 	 *
 	 * @apiNote Accessible via GET request at /findAll.
 	 * @see DeviceService#getAllDevices()
@@ -129,8 +126,7 @@ public class DeviceController {
 	 * </p>
 	 *
 	 * @return ResponseEntity containing a DataResponse with the list of device
-	 *         names if found,
-	 *         or a message indicating no device names were found.
+	 *         names if found, or a message indicating no device names were found.
 	 *
 	 * @apiNote
 	 *          <ul>
@@ -163,9 +159,9 @@ public class DeviceController {
 	 *
 	 *                               <p>
 	 *                               This endpoint deletes a device specified by its
-	 *                               ID. If the deletion is successful,
-	 *                               a success response is returned. Otherwise, an
-	 *                               exception is thrown indicating failure.
+	 *                               ID. If the deletion is successful, a success
+	 *                               response is returned. Otherwise, an exception
+	 *                               is thrown indicating failure.
 	 *                               </p>
 	 */
 	@Operation(summary = "Delete device by ID")
@@ -188,9 +184,8 @@ public class DeviceController {
 	 * Updates the information of an existing device.
 	 * <p>
 	 * This endpoint receives a {@link DeviceDTO} object containing the updated
-	 * device information.
-	 * If the update is successful, a success response is returned. Otherwise, an
-	 * exception is thrown.
+	 * device information. If the update is successful, a success response is
+	 * returned. Otherwise, an exception is thrown.
 	 * </p>
 	 *
 	 * @param deviceUpdateRequest the {@link DeviceDTO} containing updated device

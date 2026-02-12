@@ -1,3 +1,4 @@
+
 /*
 * If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
@@ -19,39 +20,47 @@ http://www.apache.org/licenses/LICENSE-2.0
 */
 package com.rdkm.tdkci.dto;
 
-import java.util.UUID;
-
 import lombok.Data;
 
 /**
- * Data Transfer Object representing Xconf configuration details.
+ * Represents the device status response DTO. This class is used to transfer
+ * device status information.
+ * 
+ * Fields: - ip: The IP address of the device. - name: The name of the device. -
+ * status: The current status of the device. - isThunderEnabled: Indicates
+ * whether Thunder is enabled on the device.
  */
 @Data
-public class XconfDTO {
+public class DeviceStatusResponseDTO {
 
 	/**
-	 * Unique identifier for the Xconf configuration.
+	 * The IP address of the device.
 	 */
-	private UUID id;
+	String ip;
 
 	/**
-	 * Name of the Xconf name associated with this configuration.
+	 * The name of the device.
 	 */
-	private String name;
+	String deviceName;
 
 	/**
-	 * Name of the Xconf configuration.
+	 * The current status of the device.
 	 */
-	private String xconfName;
+	String status;
 
 	/**
-	 * Identifier for the Xconf configuration.
+	 * The mac address of the device.
 	 */
-	private String xconfConfigId;
+	String macAddress;
 
 	/**
-	 * Description of the Xconf configuration.
+	 * Device type name
 	 */
-	private String xconfConfigDescription;
+	String deviceType;
+
+	/**
+	 * Indicates whether Thunder is enabled on the device.
+	 */
+	boolean isThunderEnabled;
 
 }

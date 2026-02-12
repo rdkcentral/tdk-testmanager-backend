@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -18,6 +18,13 @@ http://www.apache.org/licenses/LICENSE-2.0
 * limitations under the License.
 */
 package com.rdkm.tdkci.utils;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.util.Properties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,5 +58,45 @@ public class Utils {
 			LOGGER.error("Invalid category: " + category);
 			throw new ResourceNotFoundException(Constants.CATEGORY, category);
 		}
+	}
+
+	/**
+	 * Method to load properties from a file
+	 * 
+	 * @param filePath The path to the configuration file
+	 * @return The loaded properties, or null if the file does not exist or an error
+	 *         occurs
+	 */
+	private static  Properties loadPropertiesFromFile(String filePath) {
+		LOGGER.debug("Loading properties from file: {}", filePath);
+		File configFile = new File(filePath);
+		if (!configFile.exists() || !Files.exists(configFile.toPath())) {
+			LOGGER.error("No Config File !!! ");
+			return null;
+		}
+		try (InputStream is = new FileInputStream(configFile)) {
+			Properties prop = new Properties();
+			prop.load(is);
+			return prop;
+		} catch (IOException e) {
+			LOGGER.error("Error reading config file: {}", configFile, e);
+		}
+		return null;
+	}
+
+	/**
+	 * Method to get the configuration property from the specified file
+	 *
+	 * @param configFile The configuration file
+	 * @param key        The key to search for in the configuration file
+	 * @return The value of the configuration property
+	 */
+	public static String getConfigProperty(File configFile, String key) {
+		Properties prop = loadPropertiesFromFile(configFile.getPath());
+		if (prop != null) {
+			LOGGER.debug(" properties key for getting the property from config file" + prop.getProperty(key));
+			return prop.getProperty(key);
+		}
+		return null;
 	}
 }

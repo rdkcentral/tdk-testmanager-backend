@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -61,12 +61,11 @@ public class DeviceService implements IDeviceService {
 	 * Creates a new device based on the provided {@link DeviceCreateDTO} request.
 	 * <p>
 	 * Validates the device category, checks for existing devices with the same
-	 * name, IP, or MAC address,
-	 * and ensures the referenced XconfConfig exists. Populates a new {@link Device}
-	 * entity with the request data,
-	 * including suites, test scripts, image prefixes, file extension, last updated
-	 * image name, port, upgrade requirement,
-	 * and associated XconfConfig. Saves the device to the repository.
+	 * name, IP, or MAC address, and ensures the referenced XconfConfig exists.
+	 * Populates a new {@link Device} entity with the request data, including
+	 * suites, test scripts, image prefixes, file extension, last updated image
+	 * name, port, upgrade requirement, and associated XconfConfig. Saves the device
+	 * to the repository.
 	 * </p>
 	 *
 	 * @param deviceRequest the DTO containing device creation details
@@ -97,10 +96,10 @@ public class DeviceService implements IDeviceService {
 			LOGGER.error("Device with MAC Address {} already exists", deviceRequest.getDeviceMac());
 			throw new ResourceAlreadyExistsException("Device MAC Address", deviceRequest.getDeviceMac());
 		}
-		XconfConfig xconf = xconfRepository.findByName(deviceRequest.getXconfModelName());
+		XconfConfig xconf = xconfRepository.findByName(deviceRequest.getXconfConfig());
 		if (xconf == null) {
-			LOGGER.error("XconfConfig with name {} does not exist", deviceRequest.getXconfModelName());
-			throw new ResourceNotFoundException("XconfConfig Name", deviceRequest.getXconfModelName());
+			LOGGER.error("XconfConfig with name {} does not exist", deviceRequest.getXconfConfig());
+			throw new ResourceNotFoundException("XconfConfig Name", deviceRequest.getXconfConfig());
 		}
 		try {
 			Device device = new Device();
@@ -116,7 +115,8 @@ public class DeviceService implements IDeviceService {
 				device.setDeviceTestScripts(deviceRequest.getDeviceTestScripts());
 			} else {
 				LOGGER.error("Device suites and test scripts are empty for device: " + deviceRequest.getDeviceName());
-				throw new UserInputException("Device suites and test scripts cannot be empty");
+				throw new UserInputException(
+						"Device suites and test scripts cannot be empty, Either one of it should not be empty");
 			}
 			if (deviceRequest.getImagePrefixes() != null && !deviceRequest.getImagePrefixes().isEmpty()) {
 				device.setImagePrefixes(deviceRequest.getImagePrefixes());
@@ -146,11 +146,10 @@ public class DeviceService implements IDeviceService {
 	 * objects.
 	 * <p>
 	 * This method fetches all {@link Device} entities from the data source. If no
-	 * devices are found,
-	 * it logs a warning and returns {@code null}. Otherwise, it maps each
-	 * {@link Device} to a {@link DeviceDTO}
-	 * using {@link MapperUtils#convertToDeviceDTO(Device)} and returns the
-	 * resulting list.
+	 * devices are found, it logs a warning and returns {@code null}. Otherwise, it
+	 * maps each {@link Device} to a {@link DeviceDTO} using
+	 * {@link MapperUtils#convertToDeviceDTO(Device)} and returns the resulting
+	 * list.
 	 *
 	 * @return a list of {@link DeviceDTO} objects representing all devices, or
 	 *         {@code null} if no devices are found.
@@ -171,8 +170,8 @@ public class DeviceService implements IDeviceService {
 	 * Retrieves the names of all devices from the repository.
 	 * <p>
 	 * This method fetches all {@link Device} entities from the repository and
-	 * extracts their names.
-	 * If no devices are found, it logs a warning and returns {@code null}.
+	 * extracts their names. If no devices are found, it logs a warning and returns
+	 * {@code null}.
 	 * </p>
 	 *
 	 * @return a list of device names, or {@code null} if no devices are found
@@ -192,12 +191,10 @@ public class DeviceService implements IDeviceService {
 	 * Deletes a device by its unique identifier.
 	 * <p>
 	 * This method attempts to delete a device from the repository using the
-	 * provided UUID.
-	 * If the device does not exist, a {@link ResourceAlreadyExistsException} is
-	 * thrown.
-	 * Logs the deletion process and returns {@code true} if the deletion is
-	 * successful,
-	 * otherwise logs the error and returns {@code false}.
+	 * provided UUID. If the device does not exist, a
+	 * {@link ResourceAlreadyExistsException} is thrown. Logs the deletion process
+	 * and returns {@code true} if the deletion is successful, otherwise logs the
+	 * error and returns {@code false}.
 	 *
 	 * @param id the UUID of the device to be deleted
 	 * @return {@code true} if the device was deleted successfully, {@code false}
@@ -261,6 +258,9 @@ public class DeviceService implements IDeviceService {
 			LOGGER.error("Device with ID {} does not exist", deviceUpdateRequest.getId());
 			return new ResourceNotFoundException("Device ID", deviceUpdateRequest.getId().toString());
 		});
+
+		// Corner case while updateing when any other device has the same name except
+		// the current device update
 		if (!Utils.isEmpty(deviceUpdateRequest.getDeviceName())) {
 			if (deviceRepository.existsByName(deviceUpdateRequest.getDeviceName())
 					&& !existingDevice.getName().equals(deviceUpdateRequest.getDeviceName())) {
@@ -289,11 +289,11 @@ public class DeviceService implements IDeviceService {
 			}
 		}
 
-		if (!Utils.isEmpty(deviceUpdateRequest.getXconfModelName())) {
-			XconfConfig xconf = xconfRepository.findByName(deviceUpdateRequest.getXconfModelName());
+		if (!Utils.isEmpty(deviceUpdateRequest.getXconfConfig())) {
+			XconfConfig xconf = xconfRepository.findByName(deviceUpdateRequest.getXconfConfig());
 			if (xconf == null) {
-				LOGGER.error("XconfConfig with name {} does not exist", deviceUpdateRequest.getXconfModelName());
-				throw new ResourceNotFoundException("XconfConfig Name", deviceUpdateRequest.getXconfModelName());
+				LOGGER.error("XconfConfig with name {} does not exist", deviceUpdateRequest.getXconfConfig());
+				throw new ResourceNotFoundException("XconfConfig Name", deviceUpdateRequest.getXconfConfig());
 			}
 			existingDevice.setXconfConfig(xconf);
 		}

@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -50,8 +50,8 @@ public class MapperUtils {
 		LOGGER.info("Mapping XconfConfig to XconfDTO: " + xconfConfig);
 		XconfDTO xconfDTO = new XconfDTO();
 		xconfDTO.setId(xconfConfig.getId());
-		xconfDTO.setXconfDeviceTypeName(xconfConfig.getName());
-		xconfDTO.setXconfConfigName(xconfConfig.getXconfigName());
+		xconfDTO.setName(xconfConfig.getName());
+		xconfDTO.setXconfName(xconfConfig.getXconfigName());
 		xconfDTO.setXconfConfigId(xconfConfig.getXconfigId());
 		xconfDTO.setXconfConfigDescription(xconfConfig.getXconfigDescription());
 		return xconfDTO;
@@ -87,7 +87,8 @@ public class MapperUtils {
 		deviceDTO.setDeviceSuites(device.getDeviceSuites());
 		deviceDTO.setDeviceTestScripts(device.getDeviceTestScripts());
 		deviceDTO.setImagePrefixes(device.getImagePrefixes());
-		deviceDTO.setXconfModelName(device.getXconfConfig().getName());
+		deviceDTO.setXconfConfig(device.getXconfConfig().getName());
 		return deviceDTO;
 	}
+	
 }

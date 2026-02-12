@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -56,5 +56,7 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
 	 * @return true if a device with the given MAC address exists, false otherwise
 	 */
 	boolean existsByMacAddress(String deviceMac);
+	
+	Device findByName(String deviceName);
 
 }

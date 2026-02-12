@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -106,7 +106,7 @@ public class DeviceCreateDTO {
 	 * The Xconf model name for the device.
 	 * Must not be blank.
 	 */
-	@NotBlank(message = "Xconf model Name is required")
-	private String xconfModelName;
+	@NotBlank(message = "Xconf Config Name is required")
+	private String xconfConfig;
 
 }

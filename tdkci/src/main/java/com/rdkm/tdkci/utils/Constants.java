@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -25,5 +25,15 @@ package com.rdkm.tdkci.utils;
 public class Constants {
 	// Key for Category
 	public static final String CATEGORY = "Category";
+
+	public static final String BASE_FILESTORE_DIR = "fileStore";
+
+	public static final String TM_BASE_URL = "tdktmURL";
+
+	public static final String XCONF_BASE_URL = "xconfURL";
+
+	public static final String FILE_PATH_SEPERATOR = "/";
+
+	public static final String CI_CONFIG_FILE = "ci.config";
 
 }

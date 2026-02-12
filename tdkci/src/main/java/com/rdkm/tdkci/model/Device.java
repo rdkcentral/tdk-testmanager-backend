@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -130,7 +130,7 @@ public class Device extends BaseEntity {
 	/**
 	 * Reference to the XconfConfig entity associated with the device.
 	 */
-	@ManyToOne(cascade = CascadeType.PERSIST)
+	@ManyToOne(cascade = CascadeType.PERSIST )
 	@JoinColumn(name = "xconf_id", nullable = false)
 	private XconfConfig xconfConfig;
 

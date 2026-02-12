@@ -17,27 +17,33 @@ http://www.apache.org/licenses/LICENSE-2.0
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package com.rdkm.tdkci.exception;
+package com.rdkm.tdkci.enums;
 
-/**
- * This is a custom exception class that is thrown when a delete operation fails
- * due to dependent records. This is used in springboot exception handling for
- * returning appropriate response to the client
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
+/*
+ * Represents the execution trigger status.
  */
 
-public class DeleteFailedException extends RuntimeException {
+public enum ExecutionTriggerStatus {
 
-	private static final long serialVersionUID = 1L;
+	TRIGGERED, NOTTRIGGERED;
 
-	/**
-	 * This is a parameterized constructor that takes the exception message as an
-	 * argument.
-	 * 
-	 * @param message
-	 */
-
-	public String getMessage() {
-		return "Delete operation failed. Please remove the dependent records first before deleting the data.";
+	@JsonValue
+	public String toValue() {
+		return this.name();
 	}
 
+	@JsonCreator
+	public static ExecutionTriggerStatus fromValue(String value) {
+		if (value == null) {
+			return null;
+		}
+		try {
+			return ExecutionTriggerStatus.valueOf(value.toUpperCase());
+		} catch (IllegalArgumentException e) {
+			return null;
+		}
+	}
 }

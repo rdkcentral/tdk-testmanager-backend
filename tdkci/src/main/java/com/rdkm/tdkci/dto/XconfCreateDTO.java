@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -30,18 +30,18 @@ import lombok.Data;
 public class XconfCreateDTO {
 
 	/**
-	 * Name of the Xconf device type.
+	 * Name of the Xconf  name.
 	 * This field is required and must not be blank.
 	 */
 	@NotBlank(message = "Xconf Device Type Name is required")
-	private String xconfDeviceTypeName;
+	private String name;
 
 	/**
 	 * Name of the Xconf configuration.
 	 * This field is required and must not be blank.
 	 */
 	@NotBlank(message = "Xconf Config Name is required")
-	private String xconfConfigName;
+	private String xconfName;
 
 	/**
 	 * Identifier for the Xconf configuration.

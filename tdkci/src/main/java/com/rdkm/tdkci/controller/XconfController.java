@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -100,23 +100,23 @@ public class XconfController {
 	 * </p>
 	 *
 	 * @return ResponseEntity containing a DataResponse with the list of XconfDTO
-	 *         objects if found,
-	 *         or a message indicating no configurations were found.
+	 *         objects if found, or a message indicating no configurations were
+	 *         found.
 	 *
-	 * @operation.summary Get all xconf configurations
-	 *                    @apiresponse.200 Xconf configurations fetched successfully
-	 *                    @apiresponse.500 Internal server error
+	 * @operation.summary Get all xconf configurations @apiresponse.200 Xconf
+	 *                    configurations fetched successfully @apiresponse.500
+	 *                    Internal server error
 	 */
 	@Operation(summary = "Get all xconf configurations")
 	@ApiResponse(responseCode = "200", description = "Xconf configurations fetched successfully")
 	@ApiResponse(responseCode = "500", description = "Internal server error")
 	@GetMapping("/findAll")
 	public ResponseEntity<DataResponse> findAllXconfConfigurations() {
-		LOGGER.info("Fetching all xconf names");
-		List<XconfDTO> xconfList = xconfService.findAllXconfConfigurations();
-		if (xconfList != null) {
+		LOGGER.info("Fetching all xconf configurations");
+		List<XconfDTO> xconfConfigurations = xconfService.findAllXconfConfigurations();
+		if (xconfConfigurations != null) {
 			LOGGER.info("Xconf names fetched successfully");
-			return ResponseUtils.getSuccessDataResponse(xconfList);
+			return ResponseUtils.getSuccessDataResponse(xconfConfigurations);
 		} else {
 			LOGGER.error("No Xconf names found");
 			return ResponseUtils.getSuccessDataResponse("No Xconf names found");
@@ -127,13 +127,11 @@ public class XconfController {
 	 * Handles HTTP GET requests to retrieve all Xconf names.
 	 * <p>
 	 * This endpoint returns a list of Xconf names if available. If no names are
-	 * found,
-	 * it returns a message indicating that no Xconf names were found.
+	 * found, it returns a message indicating that no Xconf names were found.
 	 * </p>
 	 *
 	 * @return ResponseEntity containing a DataResponse with either the list of
-	 *         Xconf names
-	 *         or a message indicating no names were found.
+	 *         Xconf names or a message indicating no names were found.
 	 */
 	@Operation(summary = "Get all xconf names")
 	@ApiResponse(responseCode = "200", description = "Xconf names fetched successfully")
@@ -189,10 +187,9 @@ public class XconfController {
 	 *
 	 * <p>
 	 * This endpoint receives an {@link XconfDTO} object in the request body and
-	 * attempts to update
-	 * the Xconf configuration. If the update is successful, a success response is
-	 * returned.
-	 * Otherwise, an exception is thrown indicating the failure.
+	 * attempts to update the Xconf configuration. If the update is successful, a
+	 * success response is returned. Otherwise, an exception is thrown indicating
+	 * the failure.
 	 * </p>
 	 *
 	 * @param xconfUpdateRequest the {@link XconfDTO} containing the updated

@@ -1,5 +1,5 @@
 /*
-* If not stated otherwise in this file or this component's Licenses.txt file the
+* If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
 * Copyright 2024 RDK Management
@@ -79,27 +79,27 @@ public class XconfService implements IXconfService {
 	@Override
 	public boolean createXconf(XconfCreateDTO xconfRequest) {
 		LOGGER.info("xconfRequest: " + xconfRequest);
-		Utils.checkCategoryValid(xconfRequest.getXconfDeviceTypeName());
+//		Utils.checkCategoryValid(xconfRequest.getXconfName());
 		if (xconfRepository.existsByXconfigId(xconfRequest.getXconfConfigId())) {
 			LOGGER.error("XconfConfig with ID {} already exists", xconfRequest.getXconfConfigId());
 			throw new ResourceAlreadyExistsException("XconfConfig ID", xconfRequest.getXconfConfigId());
 		}
-		if (xconfRepository.findByName(xconfRequest.getXconfDeviceTypeName()) != null) {
-			LOGGER.error("XconfConfig with name {} already exists", xconfRequest.getXconfDeviceTypeName());
-			throw new ResourceAlreadyExistsException("XconfConfig Name", xconfRequest.getXconfDeviceTypeName());
+		if (xconfRepository.findByName(xconfRequest.getName()) != null) {
+			LOGGER.error("XconfConfig with name {} already exists", xconfRequest.getName());
+			throw new ResourceAlreadyExistsException("XconfConfig Name", xconfRequest.getName());
 		}
 
-		if (xconfRepository.existsByXconfigName(xconfRequest.getXconfConfigName())) {
-			LOGGER.error("XconfConfig with name {} already exists", xconfRequest.getXconfConfigName());
-			throw new ResourceAlreadyExistsException("XconfConfig Name", xconfRequest.getXconfConfigName());
+		if (xconfRepository.existsByXconfigName(xconfRequest.getXconfName())) {
+			LOGGER.error("XconfConfig with name {} already exists", xconfRequest.getXconfName());
+			throw new ResourceAlreadyExistsException("XconfConfig Name", xconfRequest.getXconfName());
 		}
 
 		try {
 			XconfConfig xconfConfig = new XconfConfig();
 			xconfConfig.setXconfigId(xconfRequest.getXconfConfigId());
-			xconfConfig.setXconfigName(xconfRequest.getXconfConfigName());
+			xconfConfig.setXconfigName(xconfRequest.getXconfName());
 			xconfConfig.setXconfigDescription(xconfRequest.getXconfConfigDescription());
-			xconfConfig.setName(xconfRequest.getXconfDeviceTypeName());
+			xconfConfig.setName(xconfRequest.getName());
 			xconfRepository.save(xconfConfig);
 			LOGGER.info("Xconf created successfully");
 			return true;
@@ -211,18 +211,18 @@ public class XconfService implements IXconfService {
 	@Override
 	public boolean updateXconf(XconfDTO xconfUpdateRequest) {
 		LOGGER.info("xconfUpdateRequest: " + xconfUpdateRequest);
-		Utils.checkCategoryValid(xconfUpdateRequest.getXconfDeviceTypeName());
+		Utils.checkCategoryValid(xconfUpdateRequest.getName());
 		XconfConfig existingXconf = xconfRepository.findById(xconfUpdateRequest.getId()).orElseThrow(() -> {
 			LOGGER.error("XconfConfig with ID {} does not exist", xconfUpdateRequest.getId());
 			return new ResourceNotFoundException("XconfConfig ID", xconfUpdateRequest.getId().toString());
 		});
-		if (!Utils.isEmpty(xconfUpdateRequest.getXconfConfigName())) {
-			if (xconfRepository.existsByXconfigName(xconfUpdateRequest.getXconfConfigName())
-					&& !existingXconf.getXconfigName().equals(xconfUpdateRequest.getXconfConfigName())) {
-				LOGGER.error("XconfConfig with name {} already exists", xconfUpdateRequest.getXconfConfigName());
-				throw new ResourceAlreadyExistsException("XconfConfig Name", xconfUpdateRequest.getXconfConfigName());
+		if (!Utils.isEmpty(xconfUpdateRequest.getXconfName())) {
+			if (xconfRepository.existsByXconfigName(xconfUpdateRequest.getXconfName())
+					&& !existingXconf.getXconfigName().equals(xconfUpdateRequest.getXconfName())) {
+				LOGGER.error("XconfConfig with name {} already exists", xconfUpdateRequest.getXconfName());
+				throw new ResourceAlreadyExistsException("XconfConfig Name", xconfUpdateRequest.getXconfName());
 			} else {
-				existingXconf.setXconfigName(xconfUpdateRequest.getXconfConfigName());
+				existingXconf.setXconfigName(xconfUpdateRequest.getXconfName());
 			}
 		}
 		if (!Utils.isEmpty(xconfUpdateRequest.getXconfConfigId())) {
@@ -234,14 +234,14 @@ public class XconfService implements IXconfService {
 				existingXconf.setXconfigId(xconfUpdateRequest.getXconfConfigId());
 			}
 		}
-		if (!Utils.isEmpty(xconfUpdateRequest.getXconfDeviceTypeName())) {
-			XconfConfig xconfByName = xconfRepository.findByName(xconfUpdateRequest.getXconfDeviceTypeName());
+		if (!Utils.isEmpty(xconfUpdateRequest.getName())) {
+			XconfConfig xconfByName = xconfRepository.findByName(xconfUpdateRequest.getName());
 			if (xconfByName != null && !xconfByName.getId().equals(xconfUpdateRequest.getId())) {
-				LOGGER.error("XconfConfig with name {} already exists", xconfUpdateRequest.getXconfDeviceTypeName());
+				LOGGER.error("XconfConfig with name {} already exists", xconfUpdateRequest.getName());
 				throw new ResourceAlreadyExistsException("XconfConfig Name",
-						xconfUpdateRequest.getXconfDeviceTypeName());
+						xconfUpdateRequest.getName());
 			} else {
-				existingXconf.setName(xconfUpdateRequest.getXconfDeviceTypeName());
+				existingXconf.setName(xconfUpdateRequest.getName());
 			}
 		}
 		if (!Utils.isEmpty(xconfUpdateRequest.getXconfConfigDescription())) {

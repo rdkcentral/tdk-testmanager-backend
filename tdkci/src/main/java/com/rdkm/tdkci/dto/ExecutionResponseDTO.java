@@ -17,27 +17,36 @@ http://www.apache.org/licenses/LICENSE-2.0
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package com.rdkm.tdkci.exception;
+package com.rdkm.tdkci.dto;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.rdkm.tdkci.enums.ExecutionTriggerStatus;
+
+import lombok.Data;
 
 /**
- * This is a custom exception class that is thrown when a delete operation fails
- * due to dependent records. This is used in springboot exception handling for
- * returning appropriate response to the client
+ * Represents the execution response DTO.
  */
-
-public class DeleteFailedException extends RuntimeException {
-
-	private static final long serialVersionUID = 1L;
+@Data
+public class ExecutionResponseDTO {
 
 	/**
-	 * This is a parameterized constructor that takes the exception message as an
-	 * argument.
-	 * 
-	 * @param message
+	 * Represents the execution trigger status.
 	 */
+	@JsonProperty("executionTriggerStatus")
+	ExecutionTriggerStatus executionTriggerStatus;
 
-	public String getMessage() {
-		return "Delete operation failed. Please remove the dependent records first before deleting the data.";
-	}
+	/**
+	 * Represents the message.
+	 */
+	@JsonProperty("message")
+	String message;
 
+	/**
+	 * Represents the execution result details URL.
+	 */
+	@JsonProperty("execResultDetailsUrl")
+	List<String> execResultDetailsUrl;
 }
