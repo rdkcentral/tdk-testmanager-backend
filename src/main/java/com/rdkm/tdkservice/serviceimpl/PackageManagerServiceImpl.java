@@ -166,7 +166,8 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		// Validation added to upload only packages that are applicable to particular
 		// device soc
 		Device deviceObj = validateDeviceAndSoc(device);
-		String regex = "(?i)" + type + "_Package_" + deviceObj.getSoc().getName().toLowerCase() + "_.*$";
+		String socName = deviceObj.getSoc().getName().toLowerCase();
+		String regex = "(?i)" + type + "_Package_(FNCS_)?" + socName + "_.*$";
 		if (!fileName.matches(regex)) {
 			LOGGER.error("Invalid file name pattern. Expected: {}", regex);
 			throw new UserInputException(
