@@ -90,7 +90,13 @@ public interface ExecutionRepository extends JpaRepository<Execution, UUID> {
 	 * @param pageable        - pageable object
 	 * @return Pagination for execution
 	 */
-	Page<Execution> findByscripttestSuiteNameContainingAndCategory(String scriptTestSuite, Category category,
+	@Query("SELECT DISTINCT e FROM Execution e " +
+			"JOIN e.executionResults er " +
+			"WHERE (e.scripttestSuiteName LIKE %:searchTerm% OR er.script LIKE %:searchTerm%) " +
+			"AND e.category = :category " +
+			"ORDER BY e.createdDate DESC")
+	Page<Execution> findByscripttestSuiteNameContainingAndCategory(@Param("searchTerm") String scriptTestSuite,
+			@Param("category") Category category,
 			Pageable pageable);
 
 	/**
