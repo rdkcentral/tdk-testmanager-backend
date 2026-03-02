@@ -770,7 +770,7 @@ public class ExportExcelService implements IExportExcelService {
 
 		Execution execution = executionRepository.findById(executionId)
 				.orElseThrow(() -> new ResourceNotFoundException("Execution id ", executionId.toString()));
-		List<ExecutionResult> executionResults = executionResultRepository.findByExecution(execution);
+		List<ExecutionResult> executionResults = execution.getExecutionResults();
 		List<Map<String, Object>> resultDataList = new ArrayList<>();
 
 		for (ExecutionResult result : executionResults) {
