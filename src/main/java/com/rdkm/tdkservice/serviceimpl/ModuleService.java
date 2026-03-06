@@ -806,14 +806,13 @@ public class ModuleService implements IModuleService {
 					function.setModule(module);
 					function = functionRepository.save(function);
 					functionRepository.flush();
-
-					// Process parameters for the current function
-					NodeList parameterNodes = functionElement.getElementsByTagName(Constants.XML_PARAMETER);
-					if (null == parameterNodes || parameterNodes.getLength() == 0) {
-						LOGGER.warn("No parameters found for function: {}", function.getName());
-					} else {
-						processParameters(parameterNodes, function);
-					}
+				}
+				// Process parameters for BOTH new and existing functions
+				NodeList parameterNodes = functionElement.getElementsByTagName(Constants.XML_PARAMETER);
+				if (null == parameterNodes || parameterNodes.getLength() == 0) {
+					LOGGER.warn("No parameters found for function: {}", function.getName());
+				} else {
+					processParameters(parameterNodes, function);
 				}
 			} catch (IllegalArgumentException | DataIntegrityViolationException e) {
 				LOGGER.error("Error processing module XML and saving", e);
@@ -875,7 +874,24 @@ public class ModuleService implements IModuleService {
 					throw new TDKServiceException("Unexpected error processing module element");
 				}
 
+			} else {
+				// Update existing parameter if changed
+				boolean changed = false;
+				ParameterDataType newDataType = ParameterDataType.valueOf(parameterDataType);
+				if (!Objects.equals(parameter.getParameterDataType(), newDataType)) {
+					parameter.setParameterDataType(newDataType);
+					changed = true;
+				}
+				if (!Objects.equals(parameter.getRangeVal(), rangeVal)) {
+					parameter.setRangeVal(rangeVal);
+					changed = true;
+				}
+				if (changed) {
+					parameterRepository.save(parameter);
+					LOGGER.info("Updated parameter: {} for function: {}", parameterName, function.getName());
+				}
 			}
+
 		}
 	}
 

@@ -1,4 +1,3 @@
-
 /*
 * If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
@@ -25,39 +24,19 @@ import java.util.List;
 import lombok.Data;
 
 /**
- * DTO for entity data containing all entity types with their lists
+ * DTO for function data containing function name and list of parameter names
  */
 @Data
-public class EntityDataDTO {
+public class FunctionDataDTO {
 
     /**
-     * List of device type names (e.g., STB, TV, Gateway)
+     * The name of the function
      */
-    private List<String> deviceType;
+    private String functionName;
 
     /**
-     * List of Original Equipment Manufacturer (OEM) names
+     * List of parameter names for the function
      */
-    private List<String> oem;
+    private List<String> parameterNames;
 
-    /**
-     * List of System on Chip (SoC) names and identifiers
-     */
-    private List<String> soc;
-
-    /**
-     * List of module data containing module names, their functions, and associated
-     * primitive tests
-     */
-    private List<ModuleDataDTO> moduleData;
-
-    /**
-     * List of test script names for automated test execution
-     */
-    private List<String> script;
-
-    /**
-     * List of test suite names containing grouped test scripts
-     */
-    private List<String> testSuite;
 }
