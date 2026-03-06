@@ -797,8 +797,12 @@ public class ModuleService implements IModuleService {
 				if (function == null) {
 					function = new Function();
 					function.setName(functionName);
-					function.setId(UUID.fromString(functionId));
-					function.setCategory(module.getCategory());
+					function.setId(UUID.fromString(functionId));					
+					if(module.getCategory() == Category.RDKV_RDKSERVICE || module.getCategory() == Category.RDKV) {
+						function.setCategory(Category.RDKV);
+					}else {
+						function.setCategory(module.getCategory());	
+					}
 					function.setModule(module);
 					function = functionRepository.save(function);
 					functionRepository.flush();

@@ -1,0 +1,193 @@
+#!/bin/bash
+##########################################################################
+# If not stated otherwise in this file or this component's LICENSE
+# file the following copyright and licenses apply:
+#
+# Copyright 2025 RDK Management
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##########################################################################
+
+# Variables - use command line argument first, then RELEASE_TAG from env file, fallback to defaults
+echo "=== CLONE SCRIPT START ==="
+
+# If command line argument provided, use it directly (Docker execution)
+if [ -n "$1" ]; then
+    RELEASE_TAG="$1"
+    echo "Using command line argument: '$RELEASE_TAG'"
+else
+    # No command line argument, try to load from .env file (manual execution)
+    echo "No command line argument provided, checking for .env file..."
+    if [ -f ".env" ]; then
+        echo "Loading .env file..."
+        export $(grep -v '^#' .env | xargs)
+        RELEASE_TAG=${RELEASE_TAG:-"main"}
+        echo "Using RELEASE_TAG from .env: '$RELEASE_TAG'"
+    else
+        RELEASE_TAG="main"
+        echo "No .env file found, using default: '$RELEASE_TAG'"
+    fi
+fi
+
+echo "Final RELEASE_TAG: '$RELEASE_TAG'"
+
+# Create working directory with release tag at /mnt/WarGeneration/
+WORK_DIR="/mnt/WarGeneration/${RELEASE_TAG}"
+echo "Creating working directory: $WORK_DIR"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+echo "Working in directory: $(pwd)"
+
+# Export and configure Backend URL from BACKEND_SPRING_URL environment variable
+export BACKEND_URL="${BACKEND_SPRING_URL:-http://localhost:8443/tdkservice}"
+
+if [ -n "$BACKEND_SPRING_URL" ]; then
+    echo "BACKEND_URL set from BACKEND_SPRING_URL environment: '$BACKEND_URL'"
+else
+    echo "BACKEND_SPRING_URL not found, using default BACKEND_URL: '$BACKEND_URL'"
+fi
+
+
+backendRepo="https://github.com/rdkcentral/tdk-testmanager-backend.git"
+coreRepo="https://github.com/rdkcentral/tdk-core.git"
+broadbandRepo="https://github.com/rdkcentral/tdk-broadband.git"
+deploymentRepo="https://github.com/rdkcentral/tdk-testmanager-deployment.git"
+
+backendDir="tdk-testmanager-backend"
+coreDir="tdk-core"
+broadbandDir="tdk-broadband"
+deploymentDir="tdk-testmanager-deployment"
+
+# Clone backend repo
+echo "Cloning backend repository..."
+if [ -d "$backendDir" ]; then rm -rf "$backendDir"; fi
+git clone -b "$RELEASE_TAG" "$backendRepo" || {
+    echo "Warning: Branch $RELEASE_TAG not found in backend repo, trying develop..."
+    git clone -b "main" "$backendRepo"
+}
+
+# Clone core repo
+echo "Cloning core repository..."
+if [ -d "$coreDir" ]; then rm -rf "$coreDir"; fi
+git clone -b "$RELEASE_TAG" "$coreRepo" || {
+    echo "Warning: Branch $RELEASE_TAG not found in core repo, trying rdk-next..."
+    git clone -b "main" "$coreRepo"
+}
+
+# Clone broadband repo
+echo "Cloning broadband repository..."
+if [ -d "$broadbandDir" ]; then rm -rf "$broadbandDir"; fi
+git clone -b "$RELEASE_TAG" "$broadbandRepo" || {
+    echo "Warning: Branch $RELEASE_TAG not found in broadband repo, trying main..."
+    git clone -b "main" "$broadbandRepo"
+}
+
+# Clone deployment repo for datamigration folder
+echo "Cloning deployment repository..."
+if [ -d "$deploymentDir" ]; then rm -rf "$deploymentDir"; fi
+git clone -b "$RELEASE_TAG" "$deploymentRepo" || {
+    echo "Warning: Branch $RELEASE_TAG not found in deployment repo, trying main..."
+    git clone -b "main" "$deploymentRepo"
+}
+
+
+#Modify tm.config file before copying
+echo "Modifying tm.config with backend URL"
+TM_CONFIG_FILE="$coreDir/framework/fileStore/tm.config"
+if [ -f "$TM_CONFIG_FILE" ]; then
+    echo "BACKEND_URL is set to: $BACKEND_URL"
+    sed -i 's|${BACKEND_URL}|'"${BACKEND_URL}"'|g' "$TM_CONFIG_FILE"
+    echo "tm.config modified successfully."
+else
+    echo "Warning: tm.config not found at $TM_CONFIG_FILE"
+fi
+
+
+# Copy fileStore from core to backend
+if [ -d "$coreDir/framework/fileStore" ]; then
+    cp -r "$coreDir/framework/fileStore" "$backendDir/src/main/webapp/"
+    echo "FileStore folder copied successfully."
+else
+    echo "Warning: FileStore folder not found in core repo."
+fi
+
+# Create testscriptsRDKB folder in fileStore
+echo "Creating testscriptsRDKB directory..."
+mkdir -p "$backendDir/src/main/webapp/fileStore/testscriptsRDKB"
+
+# Copy component folder from tdk-broadband to testscriptsRDKB
+echo "Copying component folder from broadband repo..."
+if [ -d "$broadbandDir/testscripts/RDKB/component" ]; then
+    cp -r "$broadbandDir/testscripts/RDKB/component" "$backendDir/src/main/webapp/fileStore/testscriptsRDKB/"
+    echo "Component folder copied successfully."
+else
+    echo "Warning: Component folder not found in broadband repo."
+fi
+
+# Copy integration folder from core to testscriptsRDKB
+echo "Copying integration folder from core repo..."
+if [ -d "$coreDir/framework/fileStore/testscriptsRDKBAdvanced/integration" ]; then
+    cp -r "$coreDir/framework/fileStore/testscriptsRDKBAdvanced/integration" "$backendDir/src/main/webapp/fileStore/testscriptsRDKB/"
+    echo "Integration folder copied successfully."
+else
+    echo "Warning: Integration folder not found in core repo."
+fi
+
+# Copy datamigration folder contents to backend resources/db folder
+echo "Copying datamigration folder from deployment repo..."
+if [ -d "$deploymentDir/datamigration" ]; then
+    # Create the db directory if it doesn't exist
+    mkdir -p "$backendDir/src/main/resources/db"
+
+    # Copy all contents from datamigration to the backend db folder
+    cp -r "$deploymentDir/datamigration/"* "$backendDir/src/main/resources/db/"
+    echo "Datamigration files copied to backend src/main/resources/db successfully."
+else
+    echo "Warning: Datamigration folder not found in deployment repo."
+fi
+
+
+# Build WAR file using Maven
+echo "Building WAR file with Maven..."
+cd "$backendDir"
+mvn clean install -DskipTests=true
+
+# UPGRADE_DIR is mandatory - must be provided as second parameter
+if [ -z "$2" ]; then
+    echo "ERROR: UPGRADE_DIR not provided!"
+    exit 1
+fi
+UPGRADE_DIR="$2"
+echo "Using provided UPGRADE_DIR: $UPGRADE_DIR"
+
+mkdir -p "$UPGRADE_DIR"
+# Check if any WAR file exists and rename it to tdkservice.war
+WAR_FILE=$(ls target/*.war 2>/dev/null)
+
+if [ -n "$WAR_FILE" ]; then
+        echo "WAR file found: $WAR_FILE"
+        # Rename the WAR file to tdkservice.war
+        mv "$WAR_FILE" target/tdkservice.war
+        echo "WAR file renamed to tdkservice.war."
+        # Copy the renamed WAR file to the Tomcat webapps directory
+        echo "Copying WAR file to upgrade file location..."
+        cp target/tdkservice.war "$UPGRADE_DIR"
+               
+else
+        echo "No WAR file found in target directory."
+fi
+
+echo "War Generation completed."
+
+# Output UPGRADE_DIR for backend to capture
+echo "War Generated at=$UPGRADE_DIR"

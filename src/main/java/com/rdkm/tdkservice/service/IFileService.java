@@ -20,6 +20,7 @@ http://www.apache.org/licenses/LICENSE-2.0
 package com.rdkm.tdkservice.service;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 import org.springframework.core.io.Resource;
@@ -127,4 +128,24 @@ public interface IFileService {
 	 * @return a string containing the additional logs
 	 */
 	String getAdditionalLogs(String logFileName, String executionResultID);
+
+	/**
+	 * This method is used to upload an image file.
+	 * 
+	 * @param imageFile the image file to upload
+	 * @param fileName  the name to save the file as
+	 * @return String indicating upload status
+	 */
+	public boolean uploadImage(MultipartFile imageFile, String fileName);
+
+	/**
+ 	* This method is used to upload an image file from raw binary input stream.
+	* Used for C++ clients that send raw bytes instead of multipart form data.
+	* 
+	* @param inputStream the raw input stream containing image data
+	* @param fileName    the name to save the file as
+	* @return boolean indicating upload status
+	*/
+	public boolean uploadImageFromStream(InputStream inputStream, String fileName);
+	
 }
