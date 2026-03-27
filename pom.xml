@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>com.rdkm</groupId>
 	<artifactId>tdkservice</artifactId>
-	<version>TDK_M145</version>
+	<version>TDK_M146</version>
 	<name>tdkservice</name>
 	<description>TDK Service</description>
 	<packaging>war</packaging>
