@@ -1,9 +1,8 @@
-
 /*
 * If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
-* Copyright 2024 RDK Management
+* Copyright 2026 RDK Management
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -28,36 +27,22 @@ import lombok.Data;
  * DTO for entity data containing all entity types with their lists
  */
 @Data
-public class EntityDataDTO {
+public class ModuleDataDTO {
 
     /**
-     * List of device type names (e.g., STB, TV, Gateway)
+     * Module name
      */
-    private List<String> deviceType;
+    private String moduleName;
 
     /**
-     * List of Original Equipment Manufacturer (OEM) names
+     * List of function data containing function names and parameters for this
+     * module
      */
-    private List<String> oem;
+    private List<FunctionDataDTO> functionData;
 
     /**
-     * List of System on Chip (SoC) names and identifiers
+     * List of primitive test names
      */
-    private List<String> soc;
+    private List<String> primitiveTestNames;
 
-    /**
-     * List of module data containing module names, their functions, and associated
-     * primitive tests
-     */
-    private List<ModuleDataDTO> moduleData;
-
-    /**
-     * List of test script names for automated test execution
-     */
-    private List<String> script;
-
-    /**
-     * List of test suite names containing grouped test scripts
-     */
-    private List<String> testSuite;
 }
