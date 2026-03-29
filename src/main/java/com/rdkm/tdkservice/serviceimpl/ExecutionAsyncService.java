@@ -25,6 +25,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -757,7 +759,10 @@ public class ExecutionAsyncService {
 		executionResult.setResult(ExecutionResultStatus.INPROGRESS);
 		executionResult.setStatus(ExecutionStatus.INPROGRESS);
 		executionResult.setDateOfExecution(Instant.now());
-		remarksString.append("Date of execution: ").append(executionResult.getDateOfExecution().toString())
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM dd, yyyy 'at' HH:mm:ss 'UTC'")
+				.withZone(ZoneId.of("UTC"));
+		remarksString.append("Date of execution: ")
+				.append(formatter.format(executionResult.getDateOfExecution()))
 				.append("\n");
 		executionResult.setExecutionRemarks(remarksString.toString());
 		executionResultRepository.save(executionResult);
@@ -863,11 +868,11 @@ public class ExecutionAsyncService {
 						LOGGER.info(
 								"The script execution completed,but the result status was not set from the python framework or script, setting the result status to FAILURE");
 						executionResult.setExecutionRemarks(remarksString
-								+ "The script execution completed,but the result status was not set from the python framework or script, most likely due to some issue in the script"
-								);
+								+ "The script execution completed,but the result status was not set from the python framework or script, most likely due to some issue in the script");
 					}
-					//Not removing the END_TAG_PY_COMMENT from the script logs here purposefully for easier
-					//debugging, with that we get to know that the execution got completed abruptly
+					// Not removing the END_TAG_PY_COMMENT from the script logs here purposefully
+					// for easier
+					// debugging, with that we get to know that the execution got completed abruptly
 					executionResult.setResult(finalExecutionResultStatus);
 					executionResultRepository.save(executionResult);
 

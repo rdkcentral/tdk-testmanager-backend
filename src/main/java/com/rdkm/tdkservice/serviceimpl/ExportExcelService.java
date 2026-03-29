@@ -770,7 +770,7 @@ public class ExportExcelService implements IExportExcelService {
 
 		Execution execution = executionRepository.findById(executionId)
 				.orElseThrow(() -> new ResourceNotFoundException("Execution id ", executionId.toString()));
-		List<ExecutionResult> executionResults = executionResultRepository.findByExecution(execution);
+		List<ExecutionResult> executionResults = execution.getExecutionResults();
 		List<Map<String, Object>> resultDataList = new ArrayList<>();
 
 		for (ExecutionResult result : executionResults) {
@@ -1010,23 +1010,23 @@ public class ExportExcelService implements IExportExcelService {
 				for (Map<String, Object> scriptData : moduleScripts) {
 					ExecutionResultStatus status = (ExecutionResultStatus) scriptData.get("status");
 					switch (status) {
-					case SUCCESS:
-						success++;
-						break;
-					case FAILURE:
-						failure++;
-						break;
-					case TIMEOUT:
-						timeout++;
-						break;
-					case NA:
-						notApplicable++;
-						break;
-					case SKIPPED:
-						skipped++;
-						break;
-					default:
-						LOGGER.warn("Unknown result status: {}", status);
+						case SUCCESS:
+							success++;
+							break;
+						case FAILURE:
+							failure++;
+							break;
+						case TIMEOUT:
+							timeout++;
+							break;
+						case NA:
+							notApplicable++;
+							break;
+						case SKIPPED:
+							skipped++;
+							break;
+						default:
+							LOGGER.warn("Unknown result status: {}", status);
 					}
 				}
 
@@ -2381,7 +2381,9 @@ public class ExportExcelService implements IExportExcelService {
 																										// execution
 																										// time if
 					// available
-					row.createCell(4).setCellValue(individualPreReqMatcher.group(0).trim()); // Log Data);
+					row.createCell(4)
+							.setCellValue(safeExcelValue(individualPreReqMatcher.group(0).trim(), executionResult)); // Log
+																														// Data);
 
 					if (analysis != null) {
 						row.createCell(5)
@@ -2423,7 +2425,7 @@ public class ExportExcelService implements IExportExcelService {
 				row.createCell(1).setCellValue(testCaseMatcher.group(1).trim());
 				row.createCell(2).setCellValue(testCaseMatcher.group(3).trim());
 				row.createCell(3).setCellValue(formatExecutionDateToUTC(createdDate.toString()));
-				row.createCell(4).setCellValue(testCaseMatcher.group(0).trim());
+				row.createCell(4).setCellValue(safeExcelValue(testCaseMatcher.group(0).trim(), executionResult));
 				if (analysis != null) {
 					row.createCell(5).setCellValue(
 							analysis.getAnalysisTicketID() != null ? analysis.getAnalysisTicketID().toString() : "");
@@ -2476,7 +2478,8 @@ public class ExportExcelService implements IExportExcelService {
 					row.createCell(1).setCellValue(individualPostReqMatcher.group(1).trim());
 					row.createCell(2).setCellValue(individualPostReqMatcher.group(4).trim());
 					row.createCell(3).setCellValue(formatExecutionDateToUTC(createdDate.toString()));
-					row.createCell(4).setCellValue(individualPostReqMatcher.group(0).trim());
+					row.createCell(4)
+							.setCellValue(safeExcelValue(individualPostReqMatcher.group(0).trim(), executionResult));
 					if (analysis != null) {
 						row.createCell(5)
 								.setCellValue(analysis.getAnalysisTicketID() != null
