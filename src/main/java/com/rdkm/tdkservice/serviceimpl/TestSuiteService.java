@@ -143,7 +143,15 @@ public class TestSuiteService implements ITestSuiteService {
 			throw new UserInputException(
 					"There is no script info associated with the given test suite. Please provide the script info.");
 		}
-
+		// Validate that script names are unique
+		Set<String> scriptNames = new HashSet<>();
+		for (ScriptListDTO script : scriptList) {
+			if (!scriptNames.add(script.getName())) {
+				LOGGER.error("Duplicate script name found: " + script.getName());
+				throw new UserInputException(
+						"Duplicate script name found.Each script in the test suite must be unique.");
+			}
+		}
 		// Save the test suite and script list
 		try {
 			testSuiteRepository.save(testSuite);
@@ -226,7 +234,17 @@ public class TestSuiteService implements ITestSuiteService {
 		// JPA updates in the testsuite table.
 		testSuite.setUpdatedAt(Instant.now());
 		testSuiteRepository.save(testSuite);
-
+		// Validate that script names are unique before updating
+		if (testSuiteDTO.getScripts() != null) {
+			Set<String> scriptNames = new HashSet<>();
+			for (ScriptListDTO script : testSuiteDTO.getScripts()) {
+				if (!scriptNames.add(script.getName())) {
+					LOGGER.error("Duplicate script name found: " + script.getName());
+					throw new UserInputException(
+							"Duplicate script name found. Each script in the test suite must be unique.");
+				}
+			}
+		}
 		try {
 			if (testSuiteDTO.getScripts() != null) {
 				List<ScriptListDTO> scriptsList = testSuiteDTO.getScripts();
@@ -572,6 +590,8 @@ public class TestSuiteService implements ITestSuiteService {
 		try {
 			InputStream xmlInputStream = testSuiteXMLFile.getInputStream();
 			return uploadTestSuiteXml(xmlInputStream, testSuiteName);
+		} catch (UserInputException e) {
+			throw e;
 		} catch (Exception e) {
 			LOGGER.error("Error while uploading test suite from XML file", e);
 			throw new TDKServiceException("Error while uploading test suite from XML file");
@@ -610,12 +630,17 @@ public class TestSuiteService implements ITestSuiteService {
 			}
 
 			List<ScriptListDTO> scriptListDTO = new ArrayList<>();
-
+			Set<String> duplicateScriptNames = new HashSet<>();
 			// Extract scripts
 			NodeList scriptNodes = document.getElementsByTagName("script_name");
 			for (int i = 0; i < scriptNodes.getLength(); i++) {
 				String scriptName = scriptNodes.item(i).getTextContent();
-
+				// Validate that script names are unique in the XML
+				if (!duplicateScriptNames.add(scriptName)) {
+					LOGGER.error("Duplicate script name found in XML: " + scriptName);
+					throw new UserInputException(
+							"Duplicate script name found in XML. Each script in the test suite must be unique.");
+				}
 				// Check if script already exists in the database
 				Script existingScript = scriptRepository.findByName(scriptName);
 				if (existingScript != null) {
@@ -646,6 +671,8 @@ public class TestSuiteService implements ITestSuiteService {
 				return true;
 
 			}
+		} catch (UserInputException e) {
+			throw e;
 
 		} catch (Exception e) {
 			LOGGER.error("Error while uploading script names in test suite", e);
