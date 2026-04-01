@@ -144,8 +144,8 @@ public class TestSuiteService implements ITestSuiteService {
 					"There is no script info associated with the given test suite. Please provide the script info.");
 		}
 		// Remove duplicate scripts by name, keeping only the first occurrence
-		Set<String> seenScriptNames = new LinkedHashSet<>();
-		scriptList = scriptList.stream().filter(script -> seenScriptNames.add(script.getName()))
+		Set<String> uniqueScriptNames = new LinkedHashSet<>();
+		scriptList = scriptList.stream().filter(script -> uniqueScriptNames.add(script.getName()))
 				.collect(Collectors.toList());
 		// Save the test suite and script list
 		try {
@@ -232,9 +232,9 @@ public class TestSuiteService implements ITestSuiteService {
 		try {
 			if (testSuiteDTO.getScripts() != null) {
 				// Remove duplicate scripts by name, keeping only the first occurrence
-				Set<String> seenScriptNames = new LinkedHashSet<>();
+				Set<String> uniqueScriptNames = new LinkedHashSet<>();
 				List<ScriptListDTO> scriptsList = testSuiteDTO.getScripts().stream()
-						.filter(script -> seenScriptNames.add(script.getName())).collect(Collectors.toList());
+						.filter(script -> uniqueScriptNames.add(script.getName())).collect(Collectors.toList());
 				// Delete all the existing test suite mappings
 				scriptTestSuiteRepository.deleteByTestSuite(testSuite);
 				saveScriptList(scriptsList, testSuite.getCategory(), testSuite);
@@ -615,13 +615,13 @@ public class TestSuiteService implements ITestSuiteService {
 			}
 
 			List<ScriptListDTO> scriptListDTO = new ArrayList<>();
-			Set<String> seenScriptNames = new HashSet<>();
+			Set<String> uniqueScriptNames = new HashSet<>();
 			// Extract scripts
 			NodeList scriptNodes = document.getElementsByTagName("script_name");
 			for (int i = 0; i < scriptNodes.getLength(); i++) {
 				String scriptName = scriptNodes.item(i).getTextContent();
 				// Skip duplicate script names, keeping only the first occurrence
-				if (!seenScriptNames.add(scriptName)) {
+				if (!uniqueScriptNames.add(scriptName)) {
 					LOGGER.warn("Duplicate script name found in XML: {}. Skipping.", scriptName);
 					continue;
 				}
