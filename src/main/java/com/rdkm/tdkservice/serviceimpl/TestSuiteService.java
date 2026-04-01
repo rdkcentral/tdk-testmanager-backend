@@ -143,15 +143,10 @@ public class TestSuiteService implements ITestSuiteService {
 			throw new UserInputException(
 					"There is no script info associated with the given test suite. Please provide the script info.");
 		}
-		// Validate that script names are unique
-		Set<String> scriptNames = new HashSet<>();
-		for (ScriptListDTO script : scriptList) {
-			if (!scriptNames.add(script.getName())) {
-				LOGGER.error("Duplicate script name found: " + script.getName());
-				throw new UserInputException(
-						"Duplicate script name found.Each script in the test suite must be unique.");
-			}
-		}
+		// Remove duplicate scripts by name, keeping only the first occurrence
+		Set<String> seenScriptNames = new LinkedHashSet<>();
+		scriptList = scriptList.stream().filter(script -> seenScriptNames.add(script.getName()))
+				.collect(Collectors.toList());
 		// Save the test suite and script list
 		try {
 			testSuiteRepository.save(testSuite);
@@ -234,20 +229,12 @@ public class TestSuiteService implements ITestSuiteService {
 		// JPA updates in the testsuite table.
 		testSuite.setUpdatedAt(Instant.now());
 		testSuiteRepository.save(testSuite);
-		// Validate that script names are unique before updating
-		if (testSuiteDTO.getScripts() != null) {
-			Set<String> scriptNames = new HashSet<>();
-			for (ScriptListDTO script : testSuiteDTO.getScripts()) {
-				if (!scriptNames.add(script.getName())) {
-					LOGGER.error("Duplicate script name found: " + script.getName());
-					throw new UserInputException(
-							"Duplicate script name found. Each script in the test suite must be unique.");
-				}
-			}
-		}
 		try {
 			if (testSuiteDTO.getScripts() != null) {
-				List<ScriptListDTO> scriptsList = testSuiteDTO.getScripts();
+				// Remove duplicate scripts by name, keeping only the first occurrence
+				Set<String> seenScriptNames = new LinkedHashSet<>();
+				List<ScriptListDTO> scriptsList = testSuiteDTO.getScripts().stream()
+						.filter(script -> seenScriptNames.add(script.getName())).collect(Collectors.toList());
 				// Delete all the existing test suite mappings
 				scriptTestSuiteRepository.deleteByTestSuite(testSuite);
 				saveScriptList(scriptsList, testSuite.getCategory(), testSuite);
@@ -590,8 +577,6 @@ public class TestSuiteService implements ITestSuiteService {
 		try {
 			InputStream xmlInputStream = testSuiteXMLFile.getInputStream();
 			return uploadTestSuiteXml(xmlInputStream, testSuiteName);
-		} catch (UserInputException e) {
-			throw e;
 		} catch (Exception e) {
 			LOGGER.error("Error while uploading test suite from XML file", e);
 			throw new TDKServiceException("Error while uploading test suite from XML file");
@@ -630,16 +615,15 @@ public class TestSuiteService implements ITestSuiteService {
 			}
 
 			List<ScriptListDTO> scriptListDTO = new ArrayList<>();
-			Set<String> duplicateScriptNames = new HashSet<>();
+			Set<String> seenScriptNames = new HashSet<>();
 			// Extract scripts
 			NodeList scriptNodes = document.getElementsByTagName("script_name");
 			for (int i = 0; i < scriptNodes.getLength(); i++) {
 				String scriptName = scriptNodes.item(i).getTextContent();
-				// Validate that script names are unique in the XML
-				if (!duplicateScriptNames.add(scriptName)) {
-					LOGGER.error("Duplicate script name found in XML: " + scriptName);
-					throw new UserInputException(
-							"Duplicate script name found in XML. Each script in the test suite must be unique.");
+				// Skip duplicate script names, keeping only the first occurrence
+				if (!seenScriptNames.add(scriptName)) {
+					LOGGER.warn("Duplicate script name found in XML: {}. Skipping.", scriptName);
+					continue;
 				}
 				// Check if script already exists in the database
 				Script existingScript = scriptRepository.findByName(scriptName);
@@ -671,9 +655,6 @@ public class TestSuiteService implements ITestSuiteService {
 				return true;
 
 			}
-		} catch (UserInputException e) {
-			throw e;
-
 		} catch (Exception e) {
 			LOGGER.error("Error while uploading script names in test suite", e);
 			throw new TDKServiceException("Error while uploading script names in script");
