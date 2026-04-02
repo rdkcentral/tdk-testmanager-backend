@@ -143,7 +143,10 @@ public class TestSuiteService implements ITestSuiteService {
 			throw new UserInputException(
 					"There is no script info associated with the given test suite. Please provide the script info.");
 		}
-
+		// Remove duplicate scripts by name, keeping only the first occurrence
+		Set<String> uniqueScriptNames = new LinkedHashSet<>();
+		scriptList = scriptList.stream().filter(script -> uniqueScriptNames.add(script.getName()))
+				.collect(Collectors.toList());
 		// Save the test suite and script list
 		try {
 			testSuiteRepository.save(testSuite);
@@ -226,10 +229,12 @@ public class TestSuiteService implements ITestSuiteService {
 		// JPA updates in the testsuite table.
 		testSuite.setUpdatedAt(Instant.now());
 		testSuiteRepository.save(testSuite);
-
 		try {
 			if (testSuiteDTO.getScripts() != null) {
-				List<ScriptListDTO> scriptsList = testSuiteDTO.getScripts();
+				// Remove duplicate scripts by name, keeping only the first occurrence
+				Set<String> uniqueScriptNames = new LinkedHashSet<>();
+				List<ScriptListDTO> scriptsList = testSuiteDTO.getScripts().stream()
+						.filter(script -> uniqueScriptNames.add(script.getName())).collect(Collectors.toList());
 				// Delete all the existing test suite mappings
 				scriptTestSuiteRepository.deleteByTestSuite(testSuite);
 				saveScriptList(scriptsList, testSuite.getCategory(), testSuite);
@@ -610,12 +615,16 @@ public class TestSuiteService implements ITestSuiteService {
 			}
 
 			List<ScriptListDTO> scriptListDTO = new ArrayList<>();
-
+			Set<String> uniqueScriptNames = new HashSet<>();
 			// Extract scripts
 			NodeList scriptNodes = document.getElementsByTagName("script_name");
 			for (int i = 0; i < scriptNodes.getLength(); i++) {
 				String scriptName = scriptNodes.item(i).getTextContent();
-
+				// Skip duplicate script names, keeping only the first occurrence
+				if (!uniqueScriptNames.add(scriptName)) {
+					LOGGER.warn("Duplicate script name found in XML: {}. Skipping.", scriptName);
+					continue;
+				}
 				// Check if script already exists in the database
 				Script existingScript = scriptRepository.findByName(scriptName);
 				if (existingScript != null) {
@@ -646,7 +655,6 @@ public class TestSuiteService implements ITestSuiteService {
 				return true;
 
 			}
-
 		} catch (Exception e) {
 			LOGGER.error("Error while uploading script names in test suite", e);
 			throw new TDKServiceException("Error while uploading script names in script");
