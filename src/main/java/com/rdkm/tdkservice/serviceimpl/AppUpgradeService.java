@@ -41,10 +41,13 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +72,8 @@ import com.rdkm.tdkservice.dto.DeploymentLogsDTO;
 import com.rdkm.tdkservice.dto.EntityDataDTO;
 import com.rdkm.tdkservice.dto.EntityListMetadataDTO;
 import com.rdkm.tdkservice.dto.EntityListResponseDTO;
+import com.rdkm.tdkservice.dto.FunctionDataDTO;
+import com.rdkm.tdkservice.dto.ModuleDataDTO;
 import com.rdkm.tdkservice.dto.WarGenerationMetadata;
 import com.rdkm.tdkservice.dto.WarUploadResponseDTO;
 import com.rdkm.tdkservice.exception.TDKServiceException;
@@ -219,24 +224,34 @@ public class AppUpgradeService implements IAppUpgradeService {
 			metadata.setSinceDate(since.toString());
 			metadata.setDescription("List of entities created or updated after specified date, organized by category");
 
-			// Get all entities created or updated since the specified date
+			// Get all simple entities (deviceType, oem, soc, script, testSuite)
 			Map<String, Map<String, Map<String, List<String>>>> changesByCategory = new HashMap<>();
-
-			// Process all entity types
 			processEntityChanges(changesByCategory, since);
+
+			// Build hierarchical module data (module -> functions -> parameters, module ->
+			// primitiveTests)
+			Map<String, Map<String, List<ModuleDataDTO>>> moduleDataByCategory = buildAllModuleData(since);
+
+			// Merge all categories from both maps
+			Set<String> allCategories = new HashSet<>();
+			allCategories.addAll(changesByCategory.keySet());
+			allCategories.addAll(moduleDataByCategory.keySet());
 
 			// Convert to DTO structure
 			List<CategoryChangeDTO> changes = new ArrayList<>();
-			for (Map.Entry<String, Map<String, Map<String, List<String>>>> categoryEntry : changesByCategory
-					.entrySet()) {
-				String category = categoryEntry.getKey();
-				Map<String, Map<String, List<String>>> entityData = categoryEntry.getValue();
+			for (String category : allCategories) {
+				Map<String, Map<String, List<String>>> entityData = changesByCategory.getOrDefault(category,
+						new HashMap<>());
+				Map<String, List<ModuleDataDTO>> moduleData = moduleDataByCategory.getOrDefault(category,
+						new HashMap<>());
 
 				// Create EntityDataDTO for new data
-				EntityDataDTO newData = createEntityDataDTO(entityData, "new");
+				EntityDataDTO newData = createEntityDataDTO(entityData, "new",
+						moduleData.getOrDefault("new", new ArrayList<>()));
 
 				// Create EntityDataDTO for updated data
-				EntityDataDTO updatedData = createEntityDataDTO(entityData, "updated");
+				EntityDataDTO updatedData = createEntityDataDTO(entityData, "updated",
+						moduleData.getOrDefault("updated", new ArrayList<>()));
 
 				// Create CategoryChangeDTO
 				CategoryChangeDTO categoryChange = new CategoryChangeDTO();
@@ -262,13 +277,160 @@ public class AppUpgradeService implements IAppUpgradeService {
 	}
 
 	/**
+	 * Builds hierarchical module data for all categories and change types.
+	 * Groups changed modules, functions, parameters, and primitiveTests into
+	 * a Module -> Function -> Parameter hierarchy.
+	 * 
+	 * If any function, parameter, or primitiveTest changes, its parent module
+	 * will appear in the moduleData section.
+	 *
+	 * @param since the Instant timestamp; only entities changed after this time
+	 *              are included
+	 * @return map of category -> changeType -> list of ModuleDataDTO
+	 */
+	private Map<String, Map<String, List<ModuleDataDTO>>> buildAllModuleData(Instant since) {
+		Map<String, Map<String, Map<String, ModuleDataDTO>>> workingMap = new HashMap<>();
+
+		// 1. Process changed modules
+		List<Module> changedModules = moduleRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+		for (Module m : changedModules) {
+			if (m.getName() == null)
+				continue;
+			String category = normalizeCategory(m.getCategory() != null ? m.getCategory().name() : null);
+			String changeType = m.getCreatedDate().isAfter(since) ? "new" : "updated";
+			getOrCreateModuleData(workingMap, category, changeType, m.getName());
+		}
+
+		// 2. Process changed functions — group under their parent module
+		List<Function> changedFunctions = functionRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+		for (Function f : changedFunctions) {
+			if (f.getName() == null || f.getModule() == null)
+				continue;
+			String moduleName = f.getModule().getName();
+			String category = normalizeCategory(f.getCategory() != null ? f.getCategory().name() : null);
+			String changeType = f.getCreatedDate().isAfter(since) ? "new" : "updated";
+			ModuleDataDTO moduleDTO = getOrCreateModuleData(workingMap, category, changeType, moduleName);
+
+			boolean funcExists = moduleDTO.getFunctionData().stream()
+					.anyMatch(fd -> fd.getFunctionName().equals(f.getName()));
+			if (!funcExists) {
+				FunctionDataDTO funcDTO = new FunctionDataDTO();
+				funcDTO.setFunctionName(f.getName());
+				funcDTO.setParameterNames(new ArrayList<>());
+				moduleDTO.getFunctionData().add(funcDTO);
+			}
+		}
+
+		// 3. Process changed parameters — group under their parent function and module
+		List<Parameter> changedParameters = parameterRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+		for (Parameter p : changedParameters) {
+			if (p.getName() == null || p.getFunction() == null)
+				continue;
+			Function func = p.getFunction();
+			if (func.getModule() == null)
+				continue;
+			String moduleName = func.getModule().getName();
+			String rawCategory = func.getCategory() != null ? func.getCategory().name() : null;
+			String category = normalizeCategory(rawCategory);
+			String changeType = p.getCreatedDate().isAfter(since) ? "new" : "updated";
+			ModuleDataDTO moduleDTO = getOrCreateModuleData(workingMap, category, changeType, moduleName);
+
+			// Find or create function entry within this module
+			FunctionDataDTO funcDTO = moduleDTO.getFunctionData().stream()
+					.filter(fd -> fd.getFunctionName().equals(func.getName()))
+					.findFirst()
+					.orElseGet(() -> {
+						FunctionDataDTO newFuncDTO = new FunctionDataDTO();
+						newFuncDTO.setFunctionName(func.getName());
+						newFuncDTO.setParameterNames(new ArrayList<>());
+						moduleDTO.getFunctionData().add(newFuncDTO);
+						return newFuncDTO;
+					});
+			if (!funcDTO.getParameterNames().contains(p.getName())) {
+				funcDTO.getParameterNames().add(p.getName());
+			}
+		}
+
+		// 4. Process changed primitiveTests — group under their parent module
+		List<PrimitiveTest> changedPTs = primitiveTestRepository.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+		for (PrimitiveTest pt : changedPTs) {
+			if (pt.getName() == null || pt.getModule() == null)
+				continue;
+			String moduleName = pt.getModule().getName();
+			String rawCategory = pt.getModule().getCategory() != null ? pt.getModule().getCategory().name() : null;
+			String category = normalizeCategory(rawCategory);
+			String changeType = pt.getCreatedDate().isAfter(since) ? "new" : "updated";
+			ModuleDataDTO moduleDTO = getOrCreateModuleData(workingMap, category, changeType, moduleName);
+
+			if (!moduleDTO.getPrimitiveTestNames().contains(pt.getName())) {
+				moduleDTO.getPrimitiveTestNames().add(pt.getName());
+			}
+		}
+
+		List<PrimitiveTestParameter> changedPTParams = primitiveTestParameterRepository
+				.findByCreatedDateAfterOrUpdatedAtAfter(since, since);
+		for (PrimitiveTestParameter ptp : changedPTParams) {
+			PrimitiveTest pt = ptp.getPrimitiveTest();
+			if (pt == null || pt.getName() == null || pt.getModule() == null)
+				continue;
+
+			// Skip if the primitiveTest itself is new (already handled above)
+			if (pt.getCreatedDate().isAfter(since))
+				continue;
+
+			String moduleName = pt.getModule().getName();
+			String rawCategory = pt.getModule().getCategory() != null ? pt.getModule().getCategory().name() : null;
+			String category = normalizeCategory(rawCategory);
+			ModuleDataDTO moduleDTO = getOrCreateModuleData(workingMap, category, "updated", moduleName);
+
+			if (!moduleDTO.getPrimitiveTestNames().contains(pt.getName())) {
+				moduleDTO.getPrimitiveTestNames().add(pt.getName());
+			}
+		}
+
+		// Convert working map to result format
+		Map<String, Map<String, List<ModuleDataDTO>>> result = new HashMap<>();
+		for (Map.Entry<String, Map<String, Map<String, ModuleDataDTO>>> catEntry : workingMap.entrySet()) {
+			Map<String, List<ModuleDataDTO>> changeTypeMap = new HashMap<>();
+			for (Map.Entry<String, Map<String, ModuleDataDTO>> ctEntry : catEntry.getValue().entrySet()) {
+				changeTypeMap.put(ctEntry.getKey(), new ArrayList<>(ctEntry.getValue().values()));
+			}
+			result.put(catEntry.getKey(), changeTypeMap);
+		}
+
+		return result;
+	}
+
+	/**
+	 * Gets or creates a ModuleDataDTO in the working map for the given
+	 * category, change type, and module name.
+	 */
+	private ModuleDataDTO getOrCreateModuleData(
+			Map<String, Map<String, Map<String, ModuleDataDTO>>> workingMap,
+			String category, String changeType, String moduleName) {
+		return workingMap
+				.computeIfAbsent(category, k -> new HashMap<>())
+				.computeIfAbsent(changeType, k -> new LinkedHashMap<>())
+				.computeIfAbsent(moduleName, name -> {
+					ModuleDataDTO dto = new ModuleDataDTO();
+					dto.setModuleName(name);
+					dto.setFunctionData(new ArrayList<>());
+					dto.setPrimitiveTestNames(new ArrayList<>());
+					return dto;
+				});
+	}
+
+	/**
 	 * Creates an EntityDataDTO from entity data for a specific change type
 	 * 
 	 * @param entityData the map containing entity type to change type to names
 	 * @param changeType the change type ("new" or "updated")
-	 * @return EntityDataDTO with populated data or "No changes" for empty lists
+	 * @param moduleData the hierarchical module data for this category and change
+	 *                   type
+	 * @return EntityDataDTO with populated data
 	 */
-	private EntityDataDTO createEntityDataDTO(Map<String, Map<String, List<String>>> entityData, String changeType) {
+	private EntityDataDTO createEntityDataDTO(Map<String, Map<String, List<String>>> entityData, String changeType,
+			List<ModuleDataDTO> moduleData) {
 		EntityDataDTO dto = new EntityDataDTO();
 
 		// Helper method to get list or default message
@@ -284,10 +446,7 @@ public class AppUpgradeService implements IAppUpgradeService {
 		dto.setDeviceType(getEntityList.apply("deviceType"));
 		dto.setOem(getEntityList.apply("oem"));
 		dto.setSoc(getEntityList.apply("soc"));
-		dto.setModule(getEntityList.apply("module"));
-		dto.setFunction(getEntityList.apply("function"));
-		dto.setParameter(getEntityList.apply("parameter"));
-		dto.setPrimitiveTest(getEntityList.apply("primitiveTest"));
+		dto.setModuleData(moduleData);
 		dto.setScript(getEntityList.apply("script"));
 		dto.setTestSuite(getEntityList.apply("testSuite"));
 
@@ -322,8 +481,9 @@ public class AppUpgradeService implements IAppUpgradeService {
 	}
 
 	/**
-	 * Processes entity changes and organizes them by category, entity type, and
-	 * change type (new/updated)
+	 * Processes simple entity changes and organizes them by category, entity type,
+	 * and change type (new/updated). Module-related entities are handled separately
+	 * via buildAllModuleData().
 	 */
 	private void processEntityChanges(Map<String, Map<String, Map<String, List<String>>>> changesByCategory,
 			Instant since) {
@@ -335,18 +495,6 @@ public class AppUpgradeService implements IAppUpgradeService {
 
 		// Process SOC entities
 		processSocChanges(changesByCategory, since);
-
-		// Process Module entities
-		processModuleChanges(changesByCategory, since);
-
-		// Process Function entities
-		processFunctionChanges(changesByCategory, since);
-
-		// Process Parameter entities
-		processParameterChanges(changesByCategory, since);
-
-		// Process PrimitiveTest entities
-		processPrimitiveTestChanges(changesByCategory, since);
 
 		// Process Script entities
 		processScriptChanges(changesByCategory, since);
