@@ -1454,7 +1454,7 @@ public class AppUpgradeService implements IAppUpgradeService {
 		LOGGER.info("Initiating WAR generation for release tag: {}", releaseTag);
 
 		// Validate releaseTag: must start with TDK_M followed by 3 digits
-		if (releaseTag == null || !releaseTag.matches("^TDK_M\\d{3}$")) {
+		if (releaseTag == null || (!releaseTag.equalsIgnoreCase("develop") && !releaseTag.matches("^TDK_M\\d{3}$"))) {
 			LOGGER.error("Invalid release tag format: {}", releaseTag);
 			throw new UserInputException(
 					"Release tag must start with 'TDK_M' followed by a 3-digit number (e.g., TDK_M123)");
