@@ -252,34 +252,40 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		String remoteFilePath = "/opt/TDK/logs/tdk_agent.log";
 		String deviceIp = deviceObj.getIp();
 		String scpOption = "-O";
-
-		String sshOptions = "-o StrictHostKeyChecking=no";
 		// sshpass command to bypass password that entered manually
 		String sshPass = "sshpass";
 		String password = ""; // Your password here
 		String user = "root";
 		String userPassword = "root";
 		String vtsPackageCommand = "\"find / -maxdepth 1 -name 'VTS_Package' -type d -cmin -5\"";
-		String tdkPackageCommand = "systemctl status tdk | grep 'Active: active (running)'";
+		String tdkPackageCommand = "(systemctl status tdk | grep 'Active: active (running)') || (test -f /opt/TDK/.no_tdk_agent && echo '.no_tdk_agent file found')";
 		String fncsCommand = "command -v tdk_mediapipelinetests";
-		String[] copyPackageCommand = { sshPass, "-p", password, "scp", scpOption, tdkPackagesLocation,
-				user + "@" + deviceIp + ":/" };
-		String[] copyScriptCommand = { sshPass, "-p", password, "scp", scpOption, scriptPath,
-				user + "@" + deviceIp + ":/" };
-		String[] executeScriptCommand = { sshPass, "-p", userPassword, "ssh", sshOptions, user + "@" + deviceIp,
+		String[] copyPackageCommand = { sshPass, "-p", password, "scp", scpOption,
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				tdkPackagesLocation, user + "@" + deviceIp + ":/" };
+		String[] copyScriptCommand = { sshPass, "-p", password, "scp", scpOption,
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				scriptPath, user + "@" + deviceIp + ":/" };
+		String[] executeScriptCommand = { sshPass, "-p", userPassword, "ssh",
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				user + "@" + deviceIp,
 				"mkdir -p $(dirname " + remoteFilePath + ") && sh /" + scriptName + " \"" + packageName + "\" > "
 						+ remoteFilePath
 				// No single quotes around the remote command
 		};
-		String[] logsCommand = { sshPass, "-p", userPassword, "ssh", "-o", "StrictHostKeyChecking=no",
+		String[] logsCommand = { sshPass, "-p", userPassword, "ssh",
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				user + "@" + deviceIp, "/bin/cat " + remoteFilePath };
 
-		String[] vtsPackageVerificationCommand = { sshPass, "-p", password, "ssh", user + "@" + deviceIp,
-				vtsPackageCommand };
-		String[] tdkPackageVerificationCommand = { sshPass, "-p", password, "ssh", user + "@" + deviceIp,
-				tdkPackageCommand };
-		String[] fncsVerificationCommand = { sshPass, "-p", password, "ssh", user + "@" + deviceIp, fncsCommand };
-
+		String[] vtsPackageVerificationCommand = { sshPass, "-p", password, "ssh",
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				user + "@" + deviceIp, vtsPackageCommand };
+		String[] tdkPackageVerificationCommand = { sshPass, "-p", password, "ssh",
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				user + "@" + deviceIp, tdkPackageCommand };
+		String[] fncsVerificationCommand = { sshPass, "-p", password, "ssh",
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				user + "@" + deviceIp, fncsCommand };
 		LOGGER.info("copyPackageCommand: " + Arrays.toString(copyPackageCommand));
 		LOGGER.info("copyScriptCommand: " + Arrays.toString(copyScriptCommand));
 		LOGGER.info("executeScriptCommand: " + Arrays.toString(executeScriptCommand));
