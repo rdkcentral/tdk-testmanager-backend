@@ -59,6 +59,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -155,6 +156,9 @@ public class AppUpgradeService implements IAppUpgradeService {
 
 	@Autowired
 	private ScriptExecutorService scriptExecutorService;
+
+	@Value("${info.app.version}")
+	private String appVersion;
 
 	DateTimeFormatter SQL_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")
 			.withZone(ZoneId.of("UTC"));
@@ -1332,10 +1336,11 @@ public class AppUpgradeService implements IAppUpgradeService {
 		}
 
 		try {
-			// Read the current app version for backup folder name
+			// Use the application version from build (pom.xml -> application.properties)
+			String currentVersion = appVersion;
+			LOGGER.info("Current application version for backup: {}", currentVersion);
 			String tmConfigFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
 					+ Constants.TM_CONFIG_FILE;
-			String currentVersion = commonService.getConfigProperty(new File(tmConfigFilePath), Constants.APP_VERSION);
 			String appUrl = commonService.getConfigProperty(new File(tmConfigFilePath), Constants.TM_URL);
 			String healthCheckUrl = appUrl + "actuator/health";
 			// If backup location is not provided, use default
