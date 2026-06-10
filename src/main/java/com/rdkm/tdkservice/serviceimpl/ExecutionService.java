@@ -190,6 +190,7 @@ public class ExecutionService implements IExecutionService {
 	 * @param executionTriggerDTO
 	 * @return ExecutionResponseDTO
 	 */
+	@Transactional
 	public ExecutionResponseDTO startExecution(ExecutionTriggerDTO executionTriggerDTO) {
 		// Prepare the response string
 		StringBuilder responseLogs = new StringBuilder();
