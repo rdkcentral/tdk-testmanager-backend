@@ -376,7 +376,6 @@ public class ExecutionService implements IExecutionService {
 		boolean isExecutionTriggered = false;
 		String executionName = null;
 		String executionUrlForCI = null;
-		List<String> executionUrls = new ArrayList<>();
 		for (Device device : executionDetailsDTO.getDeviceList()) {
 			if (!checkDeviceAvailabilityForExecution(device)) {
 				LOGGER.error("Device: {} is not available for execution\n",
@@ -396,8 +395,6 @@ public class ExecutionService implements IExecutionService {
 					executionDetailsDTO.isPerformanceLogsNeeded(), executionDetailsDTO.isIndividualRepeatExecution(),
 					executionDetailsDTO.getTestType(), executionDetailsDTO.getCallBackUrl(),
 					executionDetailsDTO.getCiBuildFileName(), executionDetailsDTO.getCiJobId());
-			executionUrls
-					.add(appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName=" + executionName);
 			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
 					+ executionName;
 		}
