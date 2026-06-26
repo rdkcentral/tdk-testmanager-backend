@@ -158,4 +158,9 @@ public class ExecutionSchedule extends BaseEntity {
 	 * Represents the image version that is using for the ci trigger.
 	 */
 	private String ciImageVersion;
+
+	/**
+	 * Represents the CI job ID associated with the trigger.
+	 */
+	private String ciJobId;
 }

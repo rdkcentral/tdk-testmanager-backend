@@ -754,7 +754,8 @@ public class MapperUtils {
 		Category category = Category.valueOf(categoryValue.toUpperCase());
 		executionSchedule.setCategory(category);
 		executionSchedule.setCiCallBackUrl(executionTriggerDTO.getCiCallBackUrl());
-		executionSchedule.setCiImageVersion(executionTriggerDTO.getCiImageVersion());
+		executionSchedule.setCiImageVersion(executionTriggerDTO.getCiBuildFileName());
+		executionSchedule.setCiJobId(executionTriggerDTO.getCiJobId());
 		executionSchedule.setIndividualRepeatExecution(executionTriggerDTO.isIndividualRepeatExecution());
 
 		// Execution schedule related data

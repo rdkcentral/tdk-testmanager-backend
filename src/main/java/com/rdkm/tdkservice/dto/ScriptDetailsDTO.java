@@ -46,9 +46,4 @@ public class ScriptDetailsDTO {
 	 */
 	public String logUrl;
 
-	/**
-	 * A list of test information associated with the CI script.
-	 */
-	public ArrayList<TestInfoDTO> testInfo;
-
 }

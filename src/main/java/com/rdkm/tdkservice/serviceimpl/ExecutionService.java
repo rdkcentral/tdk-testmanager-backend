@@ -215,7 +215,7 @@ public class ExecutionService implements IExecutionService {
 			}
 			LOGGER.error("No valid devices found for execution");
 			ExecutionResponseDTO executionResponseDTO = createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.NOTTRIGGERED, null);
+					ExecutionTriggerStatus.NOTTRIGGERED);
 			return executionResponseDTO;
 		}
 
@@ -275,7 +275,7 @@ public class ExecutionService implements IExecutionService {
 			responseLogs.append("No valid devices found for the script as categories are different: ")
 					.append(script.getName()).append(". So not triggering execution").append("\n");
 			ExecutionResponseDTO executionResponseDTO = createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.NOTTRIGGERED, null);
+					ExecutionTriggerStatus.NOTTRIGGERED);
 			return executionResponseDTO;
 		}
 
@@ -283,11 +283,12 @@ public class ExecutionService implements IExecutionService {
 			responseLogs.append("Script: ").append(script.getName())
 					.append(" is marked to be skipped as it is obsolete. So execution is not triggered\n");
 			ExecutionResponseDTO executionResponseDTO = createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.NOTTRIGGERED, null);
+					ExecutionTriggerStatus.NOTTRIGGERED);
 			return executionResponseDTO;
 		}
-		List<String> executionUrls = new ArrayList<>();
+		String executionUrlForCI = null;
 		boolean isScriptExecutionTriggered = false;
+		String executionName = null;
 		for (Device device : deviceList) {
 			if (!validateScriptDeviceDeviceType(device, script)) {
 				LOGGER.error("Device: {} and Script: {} combination is invalid\n", device.getName(), script.getName());
@@ -305,18 +306,19 @@ public class ExecutionService implements IExecutionService {
 			isScriptExecutionTriggered = true;
 			responseLogs.append("Executing script: ").append(script.getName()).append(" on device: ")
 					.append(device.getName()).append(".");
-			String executionName = getExecutionName(executionDetailsDTO.getExecutionName(), device,
+			executionName = getExecutionName(executionDetailsDTO.getExecutionName(), device,
 					executionDetailsDTO.getTestType());
 			LOGGER.info("Execution script on " + script.getName() + "the device" + device.getName());
 			executionAsyncService.prepareAndExecuteSingleScript(device, script, executionDetailsDTO.getUser(),
 					executionName, executionDetailsDTO.getRepeatCount(), executionDetailsDTO.isRerunOnFailure(),
 					executionDetailsDTO.isDeviceLogsNeeded(), executionDetailsDTO.isPerformanceLogsNeeded(),
 					executionDetailsDTO.isDiagnosticLogsNeeded(), executionDetailsDTO.getTestType(),
-					executionDetailsDTO.getCallBackUrl(), executionDetailsDTO.getImageVersion());
+					executionDetailsDTO.getCallBackUrl(), executionDetailsDTO.getCiBuildFileName(),
+					executionDetailsDTO.getCiJobId());
 			LOGGER.info(" Asynchronous Execution of script on " + script.getName() + "the device" + device.getName()
 					+ " triggered");
-			executionUrls
-					.add(appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName=" + executionName);
+			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
+					+ executionName;
 
 		}
 		// If atleast one execution is triggered in one box, then return the
@@ -324,12 +326,19 @@ public class ExecutionService implements IExecutionService {
 		if (isScriptExecutionTriggered) {
 			LOGGER.info("Script execution is triggered");
 			ExecutionResponseDTO executionResponseDTO = this.createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.TRIGGERED, executionUrls);
+					ExecutionTriggerStatus.TRIGGERED);
+			if ("ci".equalsIgnoreCase(executionDetailsDTO.getTestType())) {
+				executionResponseDTO.setExecNameForCI(executionName);
+				executionResponseDTO.setExecExcelReportDownloadUrlForCI(
+						appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
+								+ executionName);
+				executionResponseDTO.setExecDetailsUrlForCI(executionUrlForCI);
+			}
 			return executionResponseDTO;
 		} else {
 			LOGGER.info("Script execution is not triggered");
 			ExecutionResponseDTO executionResponseDTO = this.createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.NOTTRIGGERED, null);
+					ExecutionTriggerStatus.NOTTRIGGERED);
 			return executionResponseDTO;
 		}
 
@@ -366,6 +375,7 @@ public class ExecutionService implements IExecutionService {
 		StringBuilder responseLogs = new StringBuilder();
 		boolean isExecutionTriggered = false;
 		String executionName = null;
+		String executionUrlForCI = null;
 		List<String> executionUrls = new ArrayList<>();
 		for (Device device : executionDetailsDTO.getDeviceList()) {
 			if (!checkDeviceAvailabilityForExecution(device)) {
@@ -385,9 +395,11 @@ public class ExecutionService implements IExecutionService {
 					executionDetailsDTO.isDeviceLogsNeeded(), executionDetailsDTO.isDiagnosticLogsNeeded(),
 					executionDetailsDTO.isPerformanceLogsNeeded(), executionDetailsDTO.isIndividualRepeatExecution(),
 					executionDetailsDTO.getTestType(), executionDetailsDTO.getCallBackUrl(),
-					executionDetailsDTO.getImageVersion());
+					executionDetailsDTO.getCiBuildFileName(), executionDetailsDTO.getCiJobId());
 			executionUrls
 					.add(appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName=" + executionName);
+			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
+					+ executionName;
 		}
 
 		// If atleast one script execution is triggered in one box, then return the
@@ -395,12 +407,19 @@ public class ExecutionService implements IExecutionService {
 		if (isExecutionTriggered) {
 			LOGGER.info("Execution is triggered");
 			ExecutionResponseDTO executionResponseDTO = this.createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.TRIGGERED, executionUrls);
+					ExecutionTriggerStatus.TRIGGERED);
+			if ("ci".equalsIgnoreCase(executionDetailsDTO.getTestType())) {
+				executionResponseDTO.setExecNameForCI(executionName);
+				executionResponseDTO.setExecExcelReportDownloadUrlForCI(
+						appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
+								+ executionName);
+				executionResponseDTO.setExecDetailsUrlForCI(executionUrlForCI);
+			}
 			return executionResponseDTO;
 		} else {
 			LOGGER.info("Execution is  not triggered");
 			ExecutionResponseDTO executionResponseDTO = this.createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.NOTTRIGGERED, null);
+					ExecutionTriggerStatus.NOTTRIGGERED);
 			return executionResponseDTO;
 		}
 
@@ -436,8 +455,9 @@ public class ExecutionService implements IExecutionService {
 
 		boolean isExecutionTriggered = false;
 
+		String executionName = null;
 		StringBuilder responseLogs = new StringBuilder();
-		List<String> executionUrls = new ArrayList<>();
+		String executionUrlForCI = null;
 		for (Device device : executionDetailsDTO.getDeviceList()) {
 			if (!checkDeviceAvailabilityForExecution(device)) {
 				LOGGER.error("Device: {} is not available for execution\n",
@@ -447,7 +467,7 @@ public class ExecutionService implements IExecutionService {
 				continue;
 			}
 			isExecutionTriggered = true;
-			String executionName = getExecutionName(executionDetailsDTO.getExecutionName(), device,
+			executionName = getExecutionName(executionDetailsDTO.getExecutionName(), device,
 					executionDetailsDTO.getTestType());
 			responseLogs.append("TestSuite execution on device: ").append(device.getName()).append(".");
 			executionAsyncService.prepareAndExecuteMultiScript(device, scripts, executionDetailsDTO.getUser(),
@@ -456,9 +476,9 @@ public class ExecutionService implements IExecutionService {
 					executionDetailsDTO.isDeviceLogsNeeded(), executionDetailsDTO.isDiagnosticLogsNeeded(),
 					executionDetailsDTO.isDiagnosticLogsNeeded(), executionDetailsDTO.isIndividualRepeatExecution(),
 					executionDetailsDTO.getTestType(), executionDetailsDTO.getCallBackUrl(),
-					executionDetailsDTO.getImageVersion());
-			executionUrls
-					.add(appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName=" + executionName);
+					executionDetailsDTO.getCiBuildFileName(), executionDetailsDTO.getCiJobId());
+			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
+					+ executionName;
 
 		}
 
@@ -467,12 +487,19 @@ public class ExecutionService implements IExecutionService {
 		if (isExecutionTriggered) {
 			LOGGER.info("Execution is triggered");
 			ExecutionResponseDTO executionResponseDTO = this.createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.TRIGGERED, executionUrls);
+					ExecutionTriggerStatus.TRIGGERED);
+			if ("ci".equalsIgnoreCase(executionDetailsDTO.getTestType())) {
+				executionResponseDTO.setExecNameForCI(executionName);
+				executionResponseDTO.setExecExcelReportDownloadUrlForCI(
+						appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
+								+ executionName);
+				executionResponseDTO.setExecDetailsUrlForCI(executionUrlForCI);
+			}
 			return executionResponseDTO;
 		} else {
 			LOGGER.info("Execution is  not triggered");
 			ExecutionResponseDTO executionResponseDTO = this.createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.NOTTRIGGERED, null);
+					ExecutionTriggerStatus.NOTTRIGGERED);
 			return executionResponseDTO;
 		}
 
@@ -500,7 +527,8 @@ public class ExecutionService implements IExecutionService {
 				scriptSet.add(scriptTestSuite.getScript());
 		}
 		boolean isExecutionTriggered = false;
-		List<String> executionUrls = new ArrayList<>();
+		String executionUrlForCI = null;
+		String executionName = null;
 		for (Device device : executionDetailsDTO.getDeviceList()) {
 			if (!checkDeviceAvailabilityForExecution(device)) {
 				LOGGER.error("Device: {} is not available for execution\n",
@@ -510,7 +538,7 @@ public class ExecutionService implements IExecutionService {
 				break;
 			}
 			isExecutionTriggered = true;
-			String executionName = getExecutionName(executionDetailsDTO.getExecutionName(), device,
+			executionName = getExecutionName(executionDetailsDTO.getExecutionName(), device,
 					executionDetailsDTO.getTestType());
 			responseLogs.append("Multitestsuite execution on device: ").append(device.getName()).append(".");
 			executionAsyncService.prepareAndExecuteMultiScript(device, scriptSet, executionDetailsDTO.getUser(),
@@ -519,9 +547,9 @@ public class ExecutionService implements IExecutionService {
 					executionDetailsDTO.isDeviceLogsNeeded(), executionDetailsDTO.isDiagnosticLogsNeeded(),
 					executionDetailsDTO.isPerformanceLogsNeeded(), executionDetailsDTO.isIndividualRepeatExecution(),
 					executionDetailsDTO.getTestType(), executionDetailsDTO.getCallBackUrl(),
-					executionDetailsDTO.getImageVersion());
-			executionUrls
-					.add(appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName=" + executionName);
+					executionDetailsDTO.getCiBuildFileName(), executionDetailsDTO.getCiJobId());
+			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
+					+ executionName;
 		}
 
 		// If atleast one execution is triggered in one box, then return the
@@ -530,12 +558,19 @@ public class ExecutionService implements IExecutionService {
 		if (isExecutionTriggered) {
 			LOGGER.info("Execution is triggered");
 			ExecutionResponseDTO executionResponseDTO = this.createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.TRIGGERED, executionUrls);
+					ExecutionTriggerStatus.TRIGGERED);
+			if ("ci".equalsIgnoreCase(executionDetailsDTO.getTestType())) {
+				executionResponseDTO.setExecNameForCI(executionName);
+				executionResponseDTO.setExecExcelReportDownloadUrlForCI(
+						appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
+								+ executionName);
+				executionResponseDTO.setExecDetailsUrlForCI(executionUrlForCI);
+			}
 			return executionResponseDTO;
 		} else {
 			LOGGER.info("Execution is  not triggered");
 			ExecutionResponseDTO executionResponseDTO = this.createExecutionResponseDTO(responseLogs.toString(),
-					ExecutionTriggerStatus.NOTTRIGGERED, null);
+					ExecutionTriggerStatus.NOTTRIGGERED);
 			return executionResponseDTO;
 		}
 
@@ -588,11 +623,10 @@ public class ExecutionService implements IExecutionService {
 	 */
 
 	private ExecutionResponseDTO createExecutionResponseDTO(String message,
-			ExecutionTriggerStatus executionTriggerStatus, List<String> executionUrls) {
+			ExecutionTriggerStatus executionTriggerStatus) {
 		ExecutionResponseDTO executionResponseDTO = new ExecutionResponseDTO();
 		executionResponseDTO.setMessage(message);
 		executionResponseDTO.setExecutionTriggerStatus(executionTriggerStatus);
-		executionResponseDTO.setExecResultDetailsUrl(executionUrls);
 		return executionResponseDTO;
 	}
 
@@ -725,7 +759,8 @@ public class ExecutionService implements IExecutionService {
 
 		}
 		executionDetailsDTO.setCallBackUrl(executionTriggerDTO.getCiCallBackUrl());
-		executionDetailsDTO.setImageVersion(executionTriggerDTO.getCiImageVersion());
+		executionDetailsDTO.setCiBuildFileName(executionTriggerDTO.getCiBuildFileName());
+		executionDetailsDTO.setCiJobId(executionTriggerDTO.getCiJobId());
 		executionDetailsDTO.setIndividualRepeatExecution(executionTriggerDTO.isIndividualRepeatExecution());
 		executionDetailsDTO.setDeviceLogsNeeded(executionTriggerDTO.isDeviceLogsNeeded());
 		executionDetailsDTO.setPerformanceLogsNeeded(executionTriggerDTO.isPerformanceLogsNeeded());
@@ -1778,7 +1813,7 @@ public class ExecutionService implements IExecutionService {
 			executionAsyncService.prepareAndExecuteMultiScript(device, scripts, triggerUser, execName,
 					execution.getCategory().name(), execution.getScripttestSuiteName(), 1, false,
 					execution.isDeviceLogsNeeded(), execution.isDiagnosticLogsNeeded(),
-					execution.isDiagnosticLogsNeeded(), false, execution.getTestType(), null, null);
+					execution.isDiagnosticLogsNeeded(), false, execution.getTestType(), null, null, null);
 			LOGGER.info("Successfully re-run failed scripts for execution with id: {}", execId);
 		} catch (Exception e) {
 			LOGGER.error("Error re-running failed scripts for execution with id: {}", execId, e);
@@ -1791,8 +1826,9 @@ public class ExecutionService implements IExecutionService {
 	/**
 	 * This method is used to delete single the execution detail
 	 * 
-	 * @param id - the execution ID
-	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
+	 * @param id                   - the execution ID
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return ExecutionDetailsResponse
 	 * @throws ResourceNotFoundException - if the execution is not found
 	 */
@@ -1800,9 +1836,9 @@ public class ExecutionService implements IExecutionService {
 	@Transactional
 	public boolean deleteExecution(UUID id, boolean isDataDeletionNeeded) {
 		LOGGER.info("Deleting execution with id: {}", id);
-		// First delete all files related to the execution 
+		// First delete all files related to the execution
 		this.deleteAllFilesForTheExecution(id.toString());
-		if(!isDataDeletionNeeded) {
+		if (!isDataDeletionNeeded) {
 			LOGGER.info("Data deletion not needed for execution with id: {}", id);
 			return true;
 		}
@@ -1871,8 +1907,9 @@ public class ExecutionService implements IExecutionService {
 	/**
 	 * This method is used to delete the execution details list
 	 * 
-	 * @param id - the execution ID
-	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
+	 * @param id                   - the execution ID
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return ExecutionDetailsResponse
 	 * @throws ResourceNotFoundException - if the execution is not found
 	 */
@@ -2311,9 +2348,10 @@ public class ExecutionService implements IExecutionService {
 	/**
 	 * This method is used to delete the executions by date range
 	 * 
-	 * @param fromDate the start date
-	 * @param toDate   end date
-	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
+	 * @param fromDate             the start date
+	 * @param toDate               end date
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return total executions
 	 */
 	@Override
@@ -2466,75 +2504,82 @@ public class ExecutionService implements IExecutionService {
 	 * @return the list of executions based on the filter criteria
 	 */
 	private List<Execution> getFilteredExecutions(ExecutionSearchFilterDTO filterRequest) {
-    LOGGER.info("Filtering the execution list based on the filter criteria ");
-    try {
-        // Validate the Category
-        Category category = Category.valueOf(filterRequest.getCategory().toUpperCase());
-        if (category == null) {
-            throw new UserInputException("Invalid category name provided");
-        }
+		LOGGER.info("Filtering the execution list based on the filter criteria ");
+		try {
+			// Validate the Category
+			Category category = Category.valueOf(filterRequest.getCategory().toUpperCase());
+			if (category == null) {
+				throw new UserInputException("Invalid category name provided");
+			}
 
-        // Add page limit to the pageable object
-        Pageable pageable = Pageable.unpaged();
-        if (filterRequest.getSizeLimit() > 0) {
-            pageable = PageRequest.of(0, filterRequest.getSizeLimit());
-        } else {
-            // If no size limit added, the add without any limit
-            pageable = Pageable.unpaged();
-        }
+			// Add page limit to the pageable object
+			Pageable pageable = Pageable.unpaged();
+			if (filterRequest.getSizeLimit() > 0) {
+				pageable = PageRequest.of(0, filterRequest.getSizeLimit());
+			} else {
+				// If no size limit added, the add without any limit
+				pageable = Pageable.unpaged();
+			}
 
-        // Only SUCCESS and FAILURE status are allowed
-        List<ExecutionOverallResultStatus> executionStatuses = Arrays.asList(ExecutionOverallResultStatus.SUCCESS,
-                ExecutionOverallResultStatus.FAILURE);
+			// Only SUCCESS and FAILURE status are allowed
+			List<ExecutionOverallResultStatus> executionStatuses = Arrays.asList(ExecutionOverallResultStatus.SUCCESS,
+					ExecutionOverallResultStatus.FAILURE);
 
-        List<Execution> executions = null;
+			List<Execution> executions = null;
 
-	// The case where the execution type is not provided, is Constants.ALL, or script test suite is not provided
-	if ((Utils.isEmpty(filterRequest.getExecutionType()) || Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType()))
-                && (Utils.isEmpty(filterRequest.getScriptTestSuite()))) {
-            LOGGER.info("Fetching execution list based on category, start date, end date and status (ALL execution types)");
-            executions = executionRepository.getExecutionListByFilter(category, filterRequest.getStartDate(),
-                    filterRequest.getEndDate(), executionStatuses, pageable);
-	} else if (!Utils.isEmpty(filterRequest.getExecutionType()) && !Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType())) {
-            LOGGER.info(
-                    "Fetching execution list based on category, start date, end date, status and execution type");
-            ExecutionType executionType = ExecutionType.valueOf(filterRequest.getExecutionType().toUpperCase());
-            if (executionType == null) {
-                throw new UserInputException("Invalid execution type provided");
-            }
-            // The case where the execution type is provided and script test suite is not provided
-            if (Utils.isEmpty(filterRequest.getScriptTestSuite())) {
-                executions = executionRepository.getExecutionListByFilterWithExecutionType(category,
-                        filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses, executionType,
-                        pageable);
-            } else {
-                // The case where the execution type and script test suite are provided
-                if (executionType == ExecutionType.TESTSUITE || executionType == ExecutionType.SINGLESCRIPT) {
-                    // The case where the execution type is testsuite or singlescript
-                    executions = executionRepository.getExecutionListByFilterWithExecutionTypeAndSuitescript(
-                            category, filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses,
-                            executionType, filterRequest.getScriptTestSuite(), pageable);
-                } else {
-                    // The case where the execution type is Multiscript
-                    executions = executionRepository.getExecutionListByFilterWithExecutionType(category,
-                            filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses,
-                            executionType, pageable);
-                }
-            }
-	} else if (Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType()) && !Utils.isEmpty(filterRequest.getScriptTestSuite())) {
-            // Special case: ALL execution types but with script/test suite filter
-            LOGGER.info("Fetching execution list for ALL execution types with script/test suite filter");
-            executions = executionRepository.getExecutionListByFilter(category, filterRequest.getStartDate(),
-                    filterRequest.getEndDate(), executionStatuses, pageable);
-            // Note: You might need to add additional filtering logic here if you want to filter by script/test suite for ALL types
-        }
-        
-        return executions;
-    } catch (Exception e) {
-        LOGGER.error("Error fetching execution details based on custom filter criteria", e);
-        throw new TDKServiceException(e.getMessage());
-    }
-}
+			// The case where the execution type is not provided, is Constants.ALL, or
+			// script test suite is not provided
+			if ((Utils.isEmpty(filterRequest.getExecutionType())
+					|| Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType()))
+					&& (Utils.isEmpty(filterRequest.getScriptTestSuite()))) {
+				LOGGER.info(
+						"Fetching execution list based on category, start date, end date and status (ALL execution types)");
+				executions = executionRepository.getExecutionListByFilter(category, filterRequest.getStartDate(),
+						filterRequest.getEndDate(), executionStatuses, pageable);
+			} else if (!Utils.isEmpty(filterRequest.getExecutionType())
+					&& !Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType())) {
+				LOGGER.info(
+						"Fetching execution list based on category, start date, end date, status and execution type");
+				ExecutionType executionType = ExecutionType.valueOf(filterRequest.getExecutionType().toUpperCase());
+				if (executionType == null) {
+					throw new UserInputException("Invalid execution type provided");
+				}
+				// The case where the execution type is provided and script test suite is not
+				// provided
+				if (Utils.isEmpty(filterRequest.getScriptTestSuite())) {
+					executions = executionRepository.getExecutionListByFilterWithExecutionType(category,
+							filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses, executionType,
+							pageable);
+				} else {
+					// The case where the execution type and script test suite are provided
+					if (executionType == ExecutionType.TESTSUITE || executionType == ExecutionType.SINGLESCRIPT) {
+						// The case where the execution type is testsuite or singlescript
+						executions = executionRepository.getExecutionListByFilterWithExecutionTypeAndSuitescript(
+								category, filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses,
+								executionType, filterRequest.getScriptTestSuite(), pageable);
+					} else {
+						// The case where the execution type is Multiscript
+						executions = executionRepository.getExecutionListByFilterWithExecutionType(category,
+								filterRequest.getStartDate(), filterRequest.getEndDate(), executionStatuses,
+								executionType, pageable);
+					}
+				}
+			} else if (Constants.ALL.equalsIgnoreCase(filterRequest.getExecutionType())
+					&& !Utils.isEmpty(filterRequest.getScriptTestSuite())) {
+				// Special case: ALL execution types but with script/test suite filter
+				LOGGER.info("Fetching execution list for ALL execution types with script/test suite filter");
+				executions = executionRepository.getExecutionListByFilter(category, filterRequest.getStartDate(),
+						filterRequest.getEndDate(), executionStatuses, pageable);
+				// Note: You might need to add additional filtering logic here if you want to
+				// filter by script/test suite for ALL types
+			}
+
+			return executions;
+		} catch (Exception e) {
+			LOGGER.error("Error fetching execution details based on custom filter criteria", e);
+			throw new TDKServiceException(e.getMessage());
+		}
+	}
 
 	/**
 	 * Method that checks if any execution result is failed.
@@ -2878,7 +2923,7 @@ public class ExecutionService implements IExecutionService {
 			throw new ResourceNotFoundException("Execution", executionName);
 		}
 		String executionId = execution.getId().toString();
-		ResultDTO thirdPartyJson = executionAsyncService.getResultJson(executionId, null, null);
+		ResultDTO thirdPartyJson = executionAsyncService.getResultJson(executionId, null, null, null);
 		return thirdPartyJson;
 	}
 
@@ -3037,5 +3082,22 @@ public class ExecutionService implements IExecutionService {
 			}
 		}
 		return filteredExecutionListByDeviceName;
+	}
+
+	/**
+	 * Retrieves the execution progress status for a specific execution name.
+	 *
+	 * @param executionName the name of the execution
+	 * @return the ExecutionProgressStatus of the execution, or null if not found
+	 */
+	@Override
+	public ExecutionProgressStatus getExecutionProgressStatus(String executionName) {
+		LOGGER.info("Fetching execution progress status for execution name: {}", executionName);
+		Execution execution = executionRepository.findByName(executionName);
+		if (execution == null) {
+			LOGGER.warn("Execution not found with name: {}", executionName);
+			return null;
+		}
+		return execution.getExecutionStatus();
 	}
 }

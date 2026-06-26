@@ -51,9 +51,4 @@ public class DeviceDetailsDTO {
 	 */
 	public ArrayList<ComponentLevelDTO> componentLevelDetails;
 
-	/**
-	 * A list of system level details for the device.
-	 */
-	public ArrayList<Object> systemLevelDetails;
-
 }

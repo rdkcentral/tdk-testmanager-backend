@@ -123,6 +123,9 @@ public class ExecutionAsyncService {
 	@Autowired
 	private PythonLibraryScriptExecutorService pythonLibraryScriptExecutorService;
 
+	@Autowired
+	private JenkinsWebHookService jenkinsWebhookService;
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(ExecutionService.class);
 
 	/**
@@ -142,7 +145,8 @@ public class ExecutionAsyncService {
 	@Async
 	public void prepareAndExecuteSingleScript(Device device, Script script, String user, String executionName,
 			int repeatCount, boolean isRerunOnFailure, boolean isDeviceLogsNeeded, boolean isPerformanceLogsNeeded,
-			boolean isDiagnosticLogsNeeded, String testType, String callBackUrl, String imageVersion) {
+			boolean isDiagnosticLogsNeeded, String testType, String callBackUrl, String cibuildFileName,
+			String ciJobId) {
 		LOGGER.info("Going to execute script: {} on device: {}", script.getName(), device.getName());
 
 		try {
@@ -171,7 +175,7 @@ public class ExecutionAsyncService {
 				// for concise code
 				ExecutionEntities executionEntities = this.getExecutionEntitiesForExecution(device, script, user,
 						realExecutionName, isRerunOnFailure, isDeviceLogsNeeded, isPerformanceLogsNeeded,
-						isDiagnosticLogsNeeded, testType);
+						isDiagnosticLogsNeeded, testType, callBackUrl, cibuildFileName, ciJobId);
 				// Transfer the version File
 				this.transferVersionFileOfTheDevice(executionEntities.getExecution().getId().toString(), device,
 						executionEntities.getExecutionDevice().getId().toString());
@@ -185,7 +189,7 @@ public class ExecutionAsyncService {
 				double realExecutionTime = this.getRealExcecutionTime(executionEntities.getExecutionResult());
 				this.setExecutionTime(executionEntities.getExecution(), executionTime, realExecutionTime);
 				Execution finalExecutionStatus = this.setFinalStatusOfExecution(executionEntities.getExecution());
-				this.callCiRequest(finalExecutionStatus, callBackUrl, imageVersion);
+				this.callCiRequest(finalExecutionStatus, callBackUrl, cibuildFileName, ciJobId);
 
 				// TODO : Execution Status logic cross check once again
 				if (isRerunOnFailure && !executionStatus) {
@@ -194,7 +198,8 @@ public class ExecutionAsyncService {
 					executionStartTime = System.currentTimeMillis();
 					ExecutionEntities executionEntitiesForFailureRerun = this.getExecutionEntitiesForExecution(device,
 							script, user, realExecutionName, isRerunOnFailure, isDeviceLogsNeeded,
-							isPerformanceLogsNeeded, isDiagnosticLogsNeeded, testType);
+							isPerformanceLogsNeeded, isDiagnosticLogsNeeded, testType, callBackUrl, cibuildFileName,
+							ciJobId);
 
 					executeScriptinDevice(script, executionEntitiesForFailureRerun.getExecution(),
 							executionEntitiesForFailureRerun.getExecutionResult().get(0),
@@ -212,7 +217,7 @@ public class ExecutionAsyncService {
 					this.setExecutionTime(executionEntities.getExecution(), executionTime, realExecutionTime);
 					Execution execData = this
 							.setFinalStatusOfExecution(executionEntitiesForFailureRerun.getExecution());
-					this.callCiRequest(execData, callBackUrl, imageVersion);
+					this.callCiRequest(execData, callBackUrl, cibuildFileName, ciJobId);
 				}
 			}
 		} catch (Exception e) {
@@ -232,15 +237,16 @@ public class ExecutionAsyncService {
 	 * 
 	 * @param finalExecutionStatus - the final execution status
 	 * @param callBackUrl          - the call back url
-	 * @param imageVersion         - the image
+	 * @param cibuildFileName      - the image
 	 * 
 	 */
-	private void callCiRequest(Execution finalExecutionStatus, String callBackUrl, String imageVersion) {
-		if (!finalExecutionStatus.getTestType().contains("CI")) {
+	private void callCiRequest(Execution finalExecutionStatus, String callBackUrl, String cibuildFileName,
+			String ciJobId) {
+		if (!finalExecutionStatus.getTestType().equalsIgnoreCase("CI")) {
 			return;
 		}
 
-		ResultDTO request = getResultJson(finalExecutionStatus.getId().toString(), imageVersion, "CI");
+		ResultDTO request = getResultJson(finalExecutionStatus.getId().toString(), cibuildFileName, "CI", ciJobId);
 		LOGGER.info("CI Jsonobject: {}", request);
 
 		if (callBackUrl == null || callBackUrl.isEmpty()) {
@@ -253,7 +259,8 @@ public class ExecutionAsyncService {
 		}
 
 		try {
-			httpService.sendPostRequest(callBackUrl, request, null);
+			jenkinsWebhookService.sendResultToJenkinsWebhook(request, callBackUrl);
+			// httpService.sendPostRequest(callBackUrl, request, null);
 		} catch (Exception e) {
 			LOGGER.error("Error occurred while sending the request to the CI server", e.getMessage());
 		}
@@ -300,7 +307,8 @@ public class ExecutionAsyncService {
 	public void prepareAndExecuteMultiScript(Device device, List<Script> scriptList, String user, String executionName,
 			String category, String testSuiteName, int repeatCount, boolean isRerunOnFailure,
 			boolean isDeviceLogsNeeded, boolean isDiagnosticsLogsNeeded, boolean isPerformanceNeeded,
-			boolean isIndividualRepeatExecution, String testType, String callBackUrl, String imageVersion) {
+			boolean isIndividualRepeatExecution, String testType, String callBackUrl, String cibuildFileName,
+			String ciJobId) {
 		LOGGER.info("Executing multiple scripts execution in device:" + device.getName());
 		try {
 			// repeatCount means how many times the execution needs to be done
@@ -363,6 +371,9 @@ public class ExecutionAsyncService {
 				execution.setUser(user);
 				execution.setRepeatCount(repeatCount);
 				execution.setRerunOnFailure(isRerunOnFailure);
+				execution.setCiCallBackUrl(callBackUrl);
+				execution.setCiBuildFileName(cibuildFileName);
+				execution.setCiJobId(ciJobId);
 
 				Execution savedExecution = executionRepository.save(execution);
 
@@ -469,7 +480,7 @@ public class ExecutionAsyncService {
 					break;
 				}
 				Execution finalExecutionStatus = this.setFinalStatusOfExecution(finalExecution);
-				this.callCiRequest(finalExecutionStatus, callBackUrl, imageVersion);
+				this.callCiRequest(finalExecutionStatus, callBackUrl, cibuildFileName, ciJobId);
 
 				if (isRerunOnFailure && (finalExecutionStatus.getResult() == ExecutionOverallResultStatus.FAILURE)) {
 					List<String> failedScriptName = executableResultList.stream()
@@ -481,7 +492,9 @@ public class ExecutionAsyncService {
 						LOGGER.info("Starting Rerun due to failure: execution name: {}", rerunExecutionName);
 						prepareAndExecuteMultiScript(device, failedScripts, user, rerunExecutionName, category,
 								testSuiteName, 1, false, isDeviceLogsNeeded, isDiagnosticsLogsNeeded,
-								isPerformanceNeeded, isIndividualRepeatExecution, testType, callBackUrl, imageVersion);
+								isPerformanceNeeded, isIndividualRepeatExecution, testType, callBackUrl,
+								cibuildFileName,
+								ciJobId);
 					}
 				}
 
@@ -537,18 +550,15 @@ public class ExecutionAsyncService {
 	 *         and component level details
 	 *
 	 */
-	public ResultDTO getResultJson(String executionId, String imageVersion, String testType) {
-		LOGGER.info("Getting CI request for RDK Portal");
+	public ResultDTO getResultJson(String executionId, String cibuildFileName, String testType, String ciJobId) {
+		LOGGER.info("Getting CI request for Jenkins Portal");
 		Execution execution = executionRepository.findById(UUID.fromString(executionId)).orElse(null);
 		String baseUrl = appConfig.getBaseURL() + "/execution/getExecutionLogs?executionResultID=";
 		ResultDTO resultDTO = new ResultDTO();
-		resultDTO.setService(Constants.TDK_PORTAL_SERVICE);
-		resultDTO.setStarted_at(getEpochTime(execution.getCreatedDate()));
-		if (testType != null && testType.equals("CI")) {
-			resultDTO.setStarted_by("RDKPortal/Jenkins");
-		}
-		resultDTO.setStatus(execution.getResult().name());
-		resultDTO.setDuration(getExecutionDurationInEpoch(execution.getExecutionTime()));
+		resultDTO.setCiJobId(ciJobId);
+		resultDTO.setBuildFileName(cibuildFileName);
+		resultDTO.setStatus("CI_EXECUTION_COMPLETED");
+		resultDTO.setStatusCode(200);
 
 		ArrayList<DetailedResultDTO> resultDTOList = new ArrayList<>();
 		DetailedResultDTO detailedResultDTO = new DetailedResultDTO();
@@ -557,17 +567,12 @@ public class ExecutionAsyncService {
 		detailedResultDTO.setScriptOrTestSuite(execution.getScripttestSuiteName());
 
 		ArrayList<DeviceDetailsDTO> deviceDTOList = new ArrayList<>();
-		ArrayList<Object> systemInfoList = new ArrayList<>();
 		ExecutionDevice executionDevice = executionDeviceRepository.findByExecution(execution);
 		if (executionDevice != null) {
 			DeviceDetailsDTO deviceDetailsDTO = new DeviceDetailsDTO();
-			if (testType != null && testType.equals("CI")) {
-				deviceDetailsDTO.setDevice(getDeviceNameFromConfigFile(imageVersion));
-				deviceDetailsDTO.setImageName(imageVersion);
-			} else {
-				deviceDetailsDTO.setDevice(executionDevice.getDevice());
-				deviceDetailsDTO.setImageName(executionDevice.getBuildName());
-			}
+			deviceDetailsDTO.setDevice(executionDevice.getDevice());
+			deviceDetailsDTO.setImageName(executionDevice.getBuildName());
+
 			Device device = deviceRepository.findByName(executionDevice.getDevice());
 			deviceDetailsDTO.setDeviceType(device.getDeviceType().getName());
 
@@ -597,19 +602,6 @@ public class ExecutionAsyncService {
 						moduleStatus = false;
 					}
 
-					ArrayList<TestInfoDTO> ciTestInfoDTOList = new ArrayList<>();
-					if (moduleName.equals("rdkservices")) {
-						List<ExecutionMethodResult> executionMethodResults = executionMethodResultRepository
-								.findByExecutionResult(result);
-						for (ExecutionMethodResult methodResult : executionMethodResults) {
-							TestInfoDTO ciTestInfoDTO = new TestInfoDTO();
-							ciTestInfoDTO.setTestCaseName(methodResult.getFunctionName());
-							ciTestInfoDTO.setTestCaseStatus(methodResult.getActualResult().name());
-							ciTestInfoDTOList.add(ciTestInfoDTO);
-						}
-					}
-					scriptDetailsDTO.setTestInfo(ciTestInfoDTOList.isEmpty() ? new ArrayList<>() : ciTestInfoDTOList);
-
 					scriptDetailsDTOList.add(scriptDetailsDTO);
 				}
 
@@ -622,7 +614,6 @@ public class ExecutionAsyncService {
 				componentLevelDTOList.add(componentLevelDTO);
 			}
 			deviceDetailsDTO.setComponentLevelDetails(componentLevelDTOList);
-			deviceDetailsDTO.setSystemLevelDetails(systemInfoList);
 			deviceDTOList.add(deviceDetailsDTO);
 		}
 
@@ -637,23 +628,23 @@ public class ExecutionAsyncService {
 	 * The method is used to get the Device corresponding to the image version from
 	 * config file
 	 * 
-	 * @param imageVersion - the image version
+	 * @param cibuildFileName - the image version
 	 * 
 	 * @return - the device
 	 */
-	private String getDeviceNameFromConfigFile(String imageVersion) {
+	private String getDeviceNameFromConfigFile(String cibuildFileName) {
 		String configFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
 				+ Constants.CI_IMAGE_BOXTYPE_CONFIG_FILE;
 		List<Map<String, String>> boxTypeMap = parseConfigFile(configFilePath);
 
 		for (Map<String, String> boxType : boxTypeMap) {
 			for (Map.Entry<String, String> entry : boxType.entrySet()) {
-				if (entry.getValue() != null && entry.getValue().contains(imageVersion)) {
+				if (entry.getValue() != null && entry.getValue().contains(cibuildFileName)) {
 					return entry.getKey();
 				}
 			}
 		}
-		throw new TDKServiceException("Device name not found for image version: " + imageVersion);
+		throw new TDKServiceException("Device name not found for image version: " + cibuildFileName);
 	}
 
 	/**
@@ -1076,7 +1067,8 @@ public class ExecutionAsyncService {
 	 */
 	private ExecutionEntities getExecutionEntitiesForExecution(Device device, Script script, String user,
 			String executionName, boolean isRerunOnFailure, boolean isDeviceLogsNeeded, boolean isPerformanceLogsNeeded,
-			boolean isDiagnosticLogsNeeded, String testType) {
+			boolean isDiagnosticLogsNeeded, String testType, String callBackUrl, String cibuildFileName,
+			String ciJobId) {
 		Execution execution = new Execution();
 		execution.setName(executionName);
 		execution.setCategory(device.getCategory());
@@ -1087,9 +1079,13 @@ public class ExecutionAsyncService {
 		execution.setExecutionStatus(ExecutionProgressStatus.INPROGRESS);
 		execution.setUser(user);
 		execution.setTestType(testType);
+		execution.setCiCallBackUrl(callBackUrl);
+		execution.setCiBuildFileName(cibuildFileName);
+		execution.setCiJobId(ciJobId);
 		execution.setDeviceLogsNeeded(isDeviceLogsNeeded);
 		execution.setPerformanceLogsNeeded(isPerformanceLogsNeeded);
 		execution.setDiagnosticLogsNeeded(isDiagnosticLogsNeeded);
+
 		Execution savedExecution = executionRepository.save(execution);
 
 		// Create and save ExecutionDevice
@@ -1425,7 +1421,9 @@ public class ExecutionAsyncService {
 			double realExecutionTime = this.getRealExcecutionTime(new ArrayList<>(execution.getExecutionResults()));
 			this.setExecutionTime(execution, executionTime, realExecutionTime);
 
-			this.setFinalStatusOfExecution(execution);
+			Execution finalExecutionStatus = this.setFinalStatusOfExecution(execution);
+			this.callCiRequest(finalExecutionStatus, finalExecutionStatus.getCiCallBackUrl(),
+					finalExecutionStatus.getCiBuildFileName(), finalExecutionStatus.getCiJobId());
 
 		} catch (Exception e) {
 			LOGGER.error("Error occurred while restarting single script execution: {}", execution.getName(), e);
@@ -1670,7 +1668,10 @@ public class ExecutionAsyncService {
 			executionRepository.save(finalExecution);
 			if (!pauseExecution) {
 				LOGGER.info("All Script executions completed for device : {}", executionDevice.getDevice());
-				this.setFinalStatusOfExecution(finalExecution);
+				Execution finalExecutionStatus = this.setFinalStatusOfExecution(finalExecution);
+				// Send CI webhook only after final completion of resumed execution
+				this.callCiRequest(finalExecutionStatus, finalExecutionStatus.getCiCallBackUrl(),
+						finalExecutionStatus.getCiBuildFileName(), finalExecutionStatus.getCiJobId());
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

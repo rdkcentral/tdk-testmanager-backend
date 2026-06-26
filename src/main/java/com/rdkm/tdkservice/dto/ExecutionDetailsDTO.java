@@ -103,6 +103,11 @@ public class ExecutionDetailsDTO {
 	/*
 	 * Represents the image version that is using for the ci trigger.
 	 */
-	private String imageVersion;
+	private String ciBuildFileName;
+
+	/*
+	 * Represents the CI job ID associated with the trigger.
+	 */
+	private String ciJobId;
 
 }
