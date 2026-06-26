@@ -156,7 +156,7 @@ public class Execution extends BaseEntity {
 	private String ciCallBackUrl;
 
 	/*
-	 * The CI image version.
+	 * The CI build file name.
 	 */
 	private String ciBuildFileName;
 

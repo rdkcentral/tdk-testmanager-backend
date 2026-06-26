@@ -242,7 +242,7 @@ public class ExecutionAsyncService {
 	 */
 	private void callCiRequest(Execution finalExecutionStatus, String callBackUrl, String cibuildFileName,
 			String ciJobId) {
-		if (!finalExecutionStatus.getTestType().equalsIgnoreCase("CI")) {
+		if (!"CI".equalsIgnoreCase(finalExecutionStatus.getTestType())) {
 			return;
 		}
 
@@ -254,15 +254,15 @@ public class ExecutionAsyncService {
 		}
 
 		if (callBackUrl == null) {
-			LOGGER.error("CallBack url not found in tm.config file");
-			throw new TDKServiceException("CallBack url not found in tm.config file");
+			LOGGER.warn("No CI callback URL configured, skipping notification for execution: {}",
+					finalExecutionStatus.getId());
+			return; // ← soft fail, execution state is unaffected
 		}
 
 		try {
 			jenkinsWebhookService.sendResultToJenkinsWebhook(request, callBackUrl);
-			// httpService.sendPostRequest(callBackUrl, request, null);
 		} catch (Exception e) {
-			LOGGER.error("Error occurred while sending the request to the CI server", e.getMessage());
+			LOGGER.error("Error occurred while sending the request to the CI server", e);
 		}
 	}
 

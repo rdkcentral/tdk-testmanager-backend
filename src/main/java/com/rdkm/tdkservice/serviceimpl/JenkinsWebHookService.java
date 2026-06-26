@@ -2,7 +2,7 @@
 * If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
-* Copyright 2024 RDK Management
+* Copyright 2026 RDK Management
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -38,6 +39,10 @@ import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rdkm.tdkservice.dto.ResultDTO;
 
+/**
+ * Service class responsible for sending ResultDTO to Jenkins webhook with
+ * HMAC-SHA256 signature.
+ */
 @Service
 public class JenkinsWebHookService {
 
@@ -48,15 +53,29 @@ public class JenkinsWebHookService {
     @Value("${jenkins.webhook.hmac-secret}")
     private String hmacSecret;
 
+    @Autowired
+    private RestTemplate restTemplate;
+
+    /**
+     * Sends the given ResultDTO to the specified Jenkins webhook URL with an
+     * HMAC-SHA256 signature.
+     *
+     * @param resultDTO   the ResultDTO to send
+     * @param callBackUrl the Jenkins webhook URL to send the ResultDTO to
+     */
     public void sendResultToJenkinsWebhook(ResultDTO resultDTO, String callBackUrl) {
         LOGGER.info("Preparing to send ResultDTO to Jenkins webhook at URL: {}", callBackUrl);
-        LOGGER.info("ResultDTO content: {}", resultDTO);
         try {
             // Serialize ResultDTO to JSON — must use the exact bytes for HMAC
             ObjectMapper objectMapper = new ObjectMapper();
             byte[] payloadBytes = objectMapper.writeValueAsBytes(resultDTO);
             String payloadJson = new String(payloadBytes, StandardCharsets.UTF_8);
             LOGGER.info("Serialized ResultDTO to JSON: {}", payloadJson);
+
+            // Compute HMAC-SHA256 over the raw payload bytes
+            if (hmacSecret == null || hmacSecret.isBlank()) {
+                throw new IllegalStateException("jenkins.webhook.hmac-secret is not configured");
+            }
             // Compute HMAC-SHA256 over the raw payload bytes
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             mac.init(new SecretKeySpec(hmacSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
@@ -74,8 +93,7 @@ public class JenkinsWebHookService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("X-Signature-256", signatureHeader);
 
-            HttpEntity<String> request = new HttpEntity<>(payloadJson, headers);
-            RestTemplate restTemplate = new RestTemplate();
+            HttpEntity<byte[]> request = new HttpEntity<>(payloadBytes, headers);
             ResponseEntity<String> response = restTemplate.exchange(
                     callBackUrl, HttpMethod.POST, request, String.class);
 

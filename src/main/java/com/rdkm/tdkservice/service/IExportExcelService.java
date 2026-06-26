@@ -115,9 +115,10 @@ public interface IExportExcelService {
 	/**
 	 * Retrieves the execution details for a specific execution name.
 	 *
-	 * @param name the name of the execution for which to retrieve details
-	 * @return an Execution object containing the details of the execution, or null
-	 *         if the execution is not found
+	 * @param name the name of the execution to retrieve
+	 * @return the Execution entity with the specified name
+	 * @throws ResourceNotFoundException if no execution is found with the given
+	 *                                   name
 	 */
 	Execution getExecutionByName(String name);
 }
