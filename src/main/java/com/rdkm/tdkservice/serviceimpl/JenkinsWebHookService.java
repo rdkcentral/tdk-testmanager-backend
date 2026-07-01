@@ -70,7 +70,7 @@ public class JenkinsWebHookService {
             ObjectMapper objectMapper = new ObjectMapper();
             byte[] payloadBytes = objectMapper.writeValueAsBytes(resultDTO);
             String payloadJson = new String(payloadBytes, StandardCharsets.UTF_8);
-            LOGGER.info("Serialized ResultDTO to JSON: {}", payloadJson);
+            LOGGER.debug("Serialized ResultDTO to JSON: {}", payloadJson);
 
             // Compute HMAC-SHA256 over the raw payload bytes
             if (hmacSecret == null || hmacSecret.isBlank()) {

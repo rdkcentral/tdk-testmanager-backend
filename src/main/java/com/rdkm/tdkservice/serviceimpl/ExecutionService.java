@@ -286,7 +286,6 @@ public class ExecutionService implements IExecutionService {
 					ExecutionTriggerStatus.NOTTRIGGERED);
 			return executionResponseDTO;
 		}
-		String executionUrlForCI = null;
 		boolean isScriptExecutionTriggered = false;
 		String executionName = null;
 		for (Device device : deviceList) {
@@ -317,8 +316,9 @@ public class ExecutionService implements IExecutionService {
 					executionDetailsDTO.getCiJobId());
 			LOGGER.info(" Asynchronous Execution of script on " + script.getName() + "the device" + device.getName()
 					+ " triggered");
-			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
-					+ executionName;
+			if ("ci".equalsIgnoreCase(executionDetailsDTO.getTestType())) {
+				break;
+			}
 
 		}
 		// If atleast one execution is triggered in one box, then return the
@@ -332,7 +332,9 @@ public class ExecutionService implements IExecutionService {
 				executionResponseDTO.setExecExcelReportDownloadUrlForCI(
 						appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
 								+ executionName);
-				executionResponseDTO.setExecDetailsUrlForCI(executionUrlForCI);
+				executionResponseDTO.setExecDetailsUrlForCI(
+						appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
+								+ executionName);
 			}
 			return executionResponseDTO;
 		} else {
@@ -375,7 +377,6 @@ public class ExecutionService implements IExecutionService {
 		StringBuilder responseLogs = new StringBuilder();
 		boolean isExecutionTriggered = false;
 		String executionName = null;
-		String executionUrlForCI = null;
 		for (Device device : executionDetailsDTO.getDeviceList()) {
 			if (!checkDeviceAvailabilityForExecution(device)) {
 				LOGGER.error("Device: {} is not available for execution\n",
@@ -395,8 +396,10 @@ public class ExecutionService implements IExecutionService {
 					executionDetailsDTO.isPerformanceLogsNeeded(), executionDetailsDTO.isIndividualRepeatExecution(),
 					executionDetailsDTO.getTestType(), executionDetailsDTO.getCallBackUrl(),
 					executionDetailsDTO.getCiBuildFileName(), executionDetailsDTO.getCiJobId());
-			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
-					+ executionName;
+
+			if ("ci".equalsIgnoreCase(executionDetailsDTO.getTestType())) {
+				break;
+			}
 		}
 
 		// If atleast one script execution is triggered in one box, then return the
@@ -410,7 +413,9 @@ public class ExecutionService implements IExecutionService {
 				executionResponseDTO.setExecExcelReportDownloadUrlForCI(
 						appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
 								+ executionName);
-				executionResponseDTO.setExecDetailsUrlForCI(executionUrlForCI);
+				executionResponseDTO.setExecDetailsUrlForCI(
+						appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
+								+ executionName);
 			}
 			return executionResponseDTO;
 		} else {
@@ -454,7 +459,6 @@ public class ExecutionService implements IExecutionService {
 
 		String executionName = null;
 		StringBuilder responseLogs = new StringBuilder();
-		String executionUrlForCI = null;
 		for (Device device : executionDetailsDTO.getDeviceList()) {
 			if (!checkDeviceAvailabilityForExecution(device)) {
 				LOGGER.error("Device: {} is not available for execution\n",
@@ -474,8 +478,10 @@ public class ExecutionService implements IExecutionService {
 					executionDetailsDTO.isDiagnosticLogsNeeded(), executionDetailsDTO.isIndividualRepeatExecution(),
 					executionDetailsDTO.getTestType(), executionDetailsDTO.getCallBackUrl(),
 					executionDetailsDTO.getCiBuildFileName(), executionDetailsDTO.getCiJobId());
-			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
-					+ executionName;
+
+			if ("ci".equalsIgnoreCase(executionDetailsDTO.getTestType())) {
+				break;
+			}
 
 		}
 
@@ -490,7 +496,9 @@ public class ExecutionService implements IExecutionService {
 				executionResponseDTO.setExecExcelReportDownloadUrlForCI(
 						appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
 								+ executionName);
-				executionResponseDTO.setExecDetailsUrlForCI(executionUrlForCI);
+				executionResponseDTO.setExecDetailsUrlForCI(
+						appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
+								+ executionName);
 			}
 			return executionResponseDTO;
 		} else {
@@ -524,7 +532,6 @@ public class ExecutionService implements IExecutionService {
 				scriptSet.add(scriptTestSuite.getScript());
 		}
 		boolean isExecutionTriggered = false;
-		String executionUrlForCI = null;
 		String executionName = null;
 		for (Device device : executionDetailsDTO.getDeviceList()) {
 			if (!checkDeviceAvailabilityForExecution(device)) {
@@ -545,8 +552,10 @@ public class ExecutionService implements IExecutionService {
 					executionDetailsDTO.isPerformanceLogsNeeded(), executionDetailsDTO.isIndividualRepeatExecution(),
 					executionDetailsDTO.getTestType(), executionDetailsDTO.getCallBackUrl(),
 					executionDetailsDTO.getCiBuildFileName(), executionDetailsDTO.getCiJobId());
-			executionUrlForCI = appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
-					+ executionName;
+			if ("ci".equalsIgnoreCase(executionDetailsDTO.getTestType())) {
+				break;
+			}
+
 		}
 
 		// If atleast one execution is triggered in one box, then return the
@@ -561,7 +570,9 @@ public class ExecutionService implements IExecutionService {
 				executionResponseDTO.setExecExcelReportDownloadUrlForCI(
 						appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
 								+ executionName);
-				executionResponseDTO.setExecDetailsUrlForCI(executionUrlForCI);
+				executionResponseDTO.setExecDetailsUrlForCI(
+						appConfig.getBaseURL() + "/execution/getExecutionResultJson?executionName="
+								+ executionName);
 			}
 			return executionResponseDTO;
 		} else {

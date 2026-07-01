@@ -101,7 +101,7 @@ public class ExecutionDetailsDTO {
 	private String callBackUrl;
 
 	/*
-	 * Represents the image version that is using for the ci trigger.
+	 * Represents the build file name that is using for the ci trigger.
 	 */
 	private String ciBuildFileName;
 
