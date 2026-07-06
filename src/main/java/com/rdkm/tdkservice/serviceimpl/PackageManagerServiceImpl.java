@@ -167,7 +167,7 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		// device soc
 		Device deviceObj = validateDeviceAndSoc(device);
 		String socName = deviceObj.getSoc().getName().toLowerCase();
-		String regex = "(?i)" + type + "_Package_(FNCS_)?" + socName + "_.*$";
+		String regex = "(?i)" + type + "_Package_(NPVS_)?" + socName + "_.*$";
 		if (!fileName.matches(regex)) {
 			LOGGER.error("Invalid file name pattern. Expected: {}", regex);
 			throw new UserInputException(
@@ -259,7 +259,7 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		String userPassword = "root";
 		String vtsPackageCommand = "\"find / -maxdepth 1 -name 'VTS_Package' -type d -cmin -5\"";
 		String tdkPackageCommand = "(systemctl status tdk | grep 'Active: active (running)') || (test -f /opt/TDK/.no_tdk_agent && echo '.no_tdk_agent file found')";
-		String fncsCommand = "command -v tdk_mediapipelinetests";
+		String npvsCommand = "command -v tdk_mediapipelinetests";
 		String[] copyPackageCommand = { sshPass, "-p", password, "scp", scpOption,
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				tdkPackagesLocation, user + "@" + deviceIp + ":/" };
@@ -283,9 +283,9 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		String[] tdkPackageVerificationCommand = { sshPass, "-p", password, "ssh",
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				user + "@" + deviceIp, tdkPackageCommand };
-		String[] fncsVerificationCommand = { sshPass, "-p", password, "ssh",
+		String[] npvsVerificationCommand = { sshPass, "-p", password, "ssh",
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-				user + "@" + deviceIp, fncsCommand };
+				user + "@" + deviceIp, npvsCommand };
 		LOGGER.info("copyPackageCommand: " + Arrays.toString(copyPackageCommand));
 		LOGGER.info("copyScriptCommand: " + Arrays.toString(copyScriptCommand));
 		LOGGER.info("executeScriptCommand: " + Arrays.toString(executeScriptCommand));
@@ -306,10 +306,10 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 			LOGGER.info("Script output: {}", output);
 			PackageResponse installPackageResponse = new PackageResponse();
 			if ("TDK".equalsIgnoreCase(type)) {
-				if (packageName.contains("fncs") || packageName.contains("FNCS")) {
-					// If package is fncs then we need to verify fncs installation
-					String fncsVerification = scriptExecutorService.executeScript(fncsVerificationCommand, 60);
-					if (fncsVerification != null && !fncsVerification.isEmpty()) {
+				if (packageName.contains("npvs") || packageName.contains("NPVS")) {
+					// If package is npvs then we need to verify npvs installation
+					String npvsVerification = scriptExecutorService.executeScript(npvsVerificationCommand, 60);
+					if (npvsVerification != null && !npvsVerification.isEmpty()) {
 						String message = "\nTDK Package installed successfully.";
 						output = output + message;
 						installPackageResponse.setStatusCode(HttpStatus.OK.value());
