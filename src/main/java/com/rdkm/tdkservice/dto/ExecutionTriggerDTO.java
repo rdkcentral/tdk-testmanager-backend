@@ -103,7 +103,12 @@ public class ExecutionTriggerDTO {
 	private String ciCallBackUrl;
 
 	/*
-	 * Represents the image version that is using for the ci trigger.
+	 * Represents the build name that is using for the ci trigger.
 	 */
-	private String ciImageVersion;
+	private String ciBuildFileName;
+
+	/*
+	 * Represents the CI job ID associated with the trigger.
+	 */
+	private String ciJobId;
 }

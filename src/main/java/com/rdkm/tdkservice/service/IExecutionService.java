@@ -28,6 +28,7 @@ import org.json.JSONObject;
 import org.springframework.core.io.Resource;
 
 import com.rdkm.tdkservice.dto.ResultDTO;
+import com.rdkm.tdkservice.enums.ExecutionProgressStatus;
 import com.rdkm.tdkservice.dto.ExecutionByDateDTO;
 import com.rdkm.tdkservice.dto.ExecutionDetailsForHtmlReportDTO;
 import com.rdkm.tdkservice.dto.ExecutionDetailsResponseDTO;
@@ -170,8 +171,9 @@ public interface IExecutionService {
 	/**
 	 * Deletes an execution identified by the given UUID.
 	 *
-	 * @param id the UUID of the execution to be deleted
-	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
+	 * @param id                   the UUID of the execution to be deleted
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return true if the execution was successfully deleted, false otherwise
 	 */
 	boolean deleteExecution(UUID id, boolean isDataDeletionNeeded);
@@ -179,8 +181,10 @@ public interface IExecutionService {
 	/**
 	 * Deletes the executions with the specified IDs.
 	 *
-	 * @param ids the list of UUIDs representing the executions to be deleted
-	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
+	 * @param ids                  the list of UUIDs representing the executions to
+	 *                             be deleted
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return true if the executions were successfully deleted, false otherwise
 	 */
 	boolean deleteExecutions(List<UUID> ids, boolean isDataDeletionNeeded);
@@ -263,9 +267,10 @@ public interface IExecutionService {
 	/**
 	 * Deletes executions within the specified date range.
 	 *
-	 * @param fromDate the start date of the range (inclusive)
-	 * @param toDate   the end date of the range (inclusive)
-	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
+	 * @param fromDate             the start date of the range (inclusive)
+	 * @param toDate               the end date of the range (inclusive)
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return the number of executions deleted
 	 */
 	int deleteExecutionsByDateRange(Instant fromDate, Instant toDate, boolean isDataDeletionNeeded);
@@ -380,4 +385,12 @@ public interface IExecutionService {
 	 * @return List of ExecutionListDTO
 	 */
 	List<ExecutionListDTO> getAllExecutionByStatus(String status, String categoryName, int page, int size);
+
+	/**
+	 * Retrieves the execution progress status for a specific execution name.
+	 *
+	 * @param executionName the name of the execution
+	 * @return the ExecutionProgressStatus of the execution, or null if not found
+	 */
+	ExecutionProgressStatus getExecutionProgressStatus(String executionName);
 }

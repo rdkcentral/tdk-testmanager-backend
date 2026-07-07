@@ -42,7 +42,17 @@ public class ExecutionResponseDTO {
 	String message;
 
 	/**
-	 * Represents the execution result details URL.
+	 * Represents the execution details url for CI
 	 */
-	List<String> execResultDetailsUrl;
+	String execDetailsUrlForCI;
+
+	/*
+	 * Represents the execution name for CI
+	 */
+	String execNameForCI;
+
+	/**
+	 * Represents the execution excel report download url for CI
+	 */
+	String execExcelReportDownloadUrlForCI;
 }

@@ -150,4 +150,19 @@ public class Execution extends BaseEntity {
 	@OneToOne
 	ExecutionDevice executionDevice;
 
+	/*
+	 * The CI callback URL for webhook notification.
+	 */
+	private String ciCallBackUrl;
+
+	/*
+	 * The CI build file name.
+	 */
+	private String ciBuildFileName;
+
+	/*
+	 * The CI job ID.
+	 */
+	private String ciJobId;
+
 }

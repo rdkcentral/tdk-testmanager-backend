@@ -565,8 +565,9 @@ public class ExecutionController {
 	/**
 	 * Deletes the execution with the specified ID.
 	 *
-	 * @param id the UUID of the execution to be deleted
-	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
+	 * @param id                   the UUID of the execution to be deleted
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return a ResponseEntity containing a success Response with HTTP status 200
 	 *         if the execution is deleted, or an error Response with HTTP status
 	 *         404 if the execution is not found
@@ -590,9 +591,11 @@ public class ExecutionController {
 	/**
 	 * Deletes the executions by the provided list of IDs.
 	 *
-	 * @param ids the list of UUIDs representing the IDs of the executions to be
-	 *            deleted
-	 * @param isDataDeletionNeeded -  flag indicating whether associated data should also be deleted along with log files
+	 * @param ids                  the list of UUIDs representing the IDs of the
+	 *                             executions to be
+	 *                             deleted
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return a ResponseEntity containing a success Response with HTTP status 201
 	 *         if the executions are deleted successfully, or an error Response with
 	 *         HTTP status 404 if the executions are not found
@@ -602,7 +605,8 @@ public class ExecutionController {
 	@ApiResponse(responseCode = "201", description = "Executions deleted successfully")
 	@ApiResponse(responseCode = "404", description = "Executions not found")
 	@PostMapping("/deleteListOfExecutions")
-	public ResponseEntity<Response> deleteExecutions(@RequestBody List<UUID> ids, @RequestParam boolean isDataDeletionNeeded) {
+	public ResponseEntity<Response> deleteExecutions(@RequestBody List<UUID> ids,
+			@RequestParam boolean isDataDeletionNeeded) {
 		LOGGER.info("Deleting executions by IDs: {}", ids);
 		boolean isDeleted = executionService.deleteExecutions(ids, isDataDeletionNeeded);
 		if (isDeleted) {
@@ -617,9 +621,10 @@ public class ExecutionController {
 	/**
 	 * Deletes the executions within the specified date range.
 	 *
-	 * @param fromDate the start date of the range
-	 * @param toDate   the end date of the range
-	 * @param isDataDeletionNeeded - flag indicating whether associated data should also be deleted along with log files
+	 * @param fromDate             the start date of the range
+	 * @param toDate               the end date of the range
+	 * @param isDataDeletionNeeded - flag indicating whether associated data should
+	 *                             also be deleted along with log files
 	 * @return a ResponseEntity containing a message indicating the number of
 	 *         executions deleted
 	 *
@@ -891,8 +896,17 @@ public class ExecutionController {
 	@ApiResponses(value = { @ApiResponse(responseCode = "200", description = "Excel file generated successfully"),
 			@ApiResponse(responseCode = "500", description = "Error generating Excel file") })
 	@GetMapping("/downloadConsolidatedExcelReport")
-	public ResponseEntity<byte[]> downloadExcel(@RequestParam UUID executionId) {
-		Execution execution = exportExcelService.getExecutionById(executionId);
+	public ResponseEntity<byte[]> downloadExcel(
+			@RequestParam(required = false) UUID executionId,
+			@RequestParam(required = false) String executionName) {
+		Execution execution;
+		if (executionId != null) {
+			execution = exportExcelService.getExecutionById(executionId);
+		} else if (executionName != null && !executionName.isBlank()) {
+			execution = exportExcelService.getExecutionByName(executionName);
+		} else {
+			throw new UserInputException("Either executionId or executionName must be provided");
+		}
 		byte[] excelData = exportExcelService.generateExcelReport(execution);
 
 		if (excelData == null || excelData.length == 0) {
@@ -1513,7 +1527,8 @@ public class ExecutionController {
 
 	/**
 	 * This method is used to upload an image file for the screencapture scripts.
-	 * Supports both multipart form data (browser/curl -F) and raw binary POST (C++ clients).
+	 * Supports both multipart form data (browser/curl -F) and raw binary POST (C++
+	 * clients).
 	 * 
 	 * @param request  the HTTP servlet request
 	 * @param image    the image file to upload (optional for raw POST)
@@ -1521,7 +1536,7 @@ public class ExecutionController {
 	 * @return ResponseEntity<Response> with the status of the upload
 	 */
 	@Operation(summary = "Upload Image")
-	@ApiResponses(value = { 
+	@ApiResponses(value = {
 			@ApiResponse(responseCode = "200", description = "Image uploaded successfully"),
 			@ApiResponse(responseCode = "400", description = "Invalid image file/Image file is missing"),
 			@ApiResponse(responseCode = "500", description = "Failed to upload image") })
@@ -1530,12 +1545,12 @@ public class ExecutionController {
 			HttpServletRequest request,
 			@RequestParam(required = false) MultipartFile image,
 			@RequestParam(defaultValue = "TDKScreenShot.png") String fileName) {
-		
+
 		LOGGER.info("Starting image upload: {}", fileName);
 		boolean result;
-		
+
 		String contentType = request.getContentType();
-		
+
 		if (contentType != null && contentType.toLowerCase().startsWith("multipart/")) {
 			// Handle multipart form data (browser / curl -F)
 			if (image == null || image.isEmpty()) {
@@ -1544,7 +1559,8 @@ public class ExecutionController {
 			}
 			result = fileService.uploadImage(image, fileName);
 		} else {
-			// Handle raw binary POST (C++ clients sending raw bytes) when called from the device
+			// Handle raw binary POST (C++ clients sending raw bytes) when called from the
+			// device
 			try {
 				result = fileService.uploadImageFromStream(request.getInputStream(), fileName);
 			} catch (IOException e) {
@@ -1552,12 +1568,38 @@ public class ExecutionController {
 				throw new TDKServiceException("Failed to read upload data: " + e.getMessage());
 			}
 		}
-		
+
 		if (result) {
 			return ResponseUtils.getSuccessResponse("Image uploaded successfully");
 		} else {
 			LOGGER.error("Image upload failed for file: {}", fileName);
 			throw new TDKServiceException("Failed to upload image");
+		}
+	}
+
+	/**
+	 * Retrieves the execution progress status for a given execution name.
+	 *
+	 * @param executionName the name of the execution
+	 * @return ResponseEntity containing the ExecutionProgressStatus if found,
+	 *         or a 404 response if the execution is not found
+	 */
+	@Operation(summary = "Get execution progress status by execution name")
+	@ApiResponses(value = {
+			@ApiResponse(responseCode = "200", description = "Execution progress status fetched successfully"),
+			@ApiResponse(responseCode = "404", description = "Execution not found with the given name"),
+			@ApiResponse(responseCode = "500", description = "Failed to get execution progress status") })
+	@GetMapping("/getExecutionProgressStatus")
+	public ResponseEntity<String> getExecutionProgressStatus(@RequestParam String executionName) {
+		LOGGER.info("Fetching execution progress status for execution name: {}", executionName);
+		var status = executionService.getExecutionProgressStatus(executionName);
+		if (status != null) {
+			LOGGER.info("Execution progress status fetched successfully for: {}", executionName);
+			return ResponseEntity.ok(status.name());
+		} else {
+			LOGGER.error("Execution not found with name: {}", executionName);
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body("Execution not found with name: " + executionName);
 		}
 	}
 

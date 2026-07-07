@@ -111,4 +111,14 @@ public interface IExportExcelService {
 	 * @return a ByteArrayInputStream containing the generated Excel report
 	 */
 	ByteArrayInputStream generateComparisonExcelReportByNames(String baseExecName, List<String> executionNames);
+
+	/**
+	 * Retrieves the execution details for a specific execution name.
+	 *
+	 * @param name the name of the execution to retrieve
+	 * @return the Execution entity with the specified name
+	 * @throws ResourceNotFoundException if no execution is found with the given
+	 *                                   name
+	 */
+	Execution getExecutionByName(String name);
 }

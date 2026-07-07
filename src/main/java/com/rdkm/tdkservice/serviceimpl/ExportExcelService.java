@@ -3069,4 +3069,20 @@ public class ExportExcelService implements IExportExcelService {
 		}
 	}
 
+	/**
+	 * Retrieves an Execution entity by its name.
+	 *
+	 * @param name the name of the execution to retrieve
+	 * @return the Execution entity with the specified name
+	 * @throws ResourceNotFoundException if no execution is found with the given
+	 *                                   name
+	 */
+	public Execution getExecutionByName(String name) {
+		Execution execution = executionRepository.findByName(name);
+		if (execution == null) {
+			throw new ResourceNotFoundException("Execution", "name: " + name);
+		}
+		return execution;
+	}
+
 }
