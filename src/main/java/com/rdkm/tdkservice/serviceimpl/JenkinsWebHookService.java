@@ -50,48 +50,45 @@ public class JenkinsWebHookService {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
-    @Value("${jenkins.webhook.hmac-secret}")
-    private String hmacSecret;
-
     @Autowired
     private RestTemplate restTemplate;
 
     /**
-     * Sends the given ResultDTO to the specified Jenkins webhook URL with an
-     * HMAC-SHA256 signature.
+     * Sends the given ResultDTO to the specified Jenkins webhook URL.
+     * Signs the payload with HMAC-SHA256 using the provided {@code secret}.
+     * If {@code secret} is null or blank the request is sent without a
+     * signature header and a warning is logged.
      *
      * @param resultDTO   the ResultDTO to send
-     * @param callBackUrl the Jenkins webhook URL to send the ResultDTO to
+     * @param callBackUrl the Jenkins webhook URL
+     * @param secret      the HMAC-SHA256 secret for this CI app; may be null
      */
-    public void sendResultToJenkinsWebhook(ResultDTO resultDTO, String callBackUrl) {
+    public void sendResultToJenkinsWebhook(ResultDTO resultDTO, String callBackUrl, String secret) {
         LOGGER.info("Preparing to send ResultDTO to Jenkins webhook at URL: {}", callBackUrl);
         try {
-            // Serialize ResultDTO to JSON — must use the exact bytes for HMAC
             ObjectMapper objectMapper = new ObjectMapper();
             byte[] payloadBytes = objectMapper.writeValueAsBytes(resultDTO);
-            String payloadJson = new String(payloadBytes, StandardCharsets.UTF_8);
-            LOGGER.debug("Serialized ResultDTO to JSON: {}", payloadJson);
+            LOGGER.debug("Serialized ResultDTO to JSON: {}",
+                    new String(payloadBytes, StandardCharsets.UTF_8));
 
-            // Compute HMAC-SHA256 over the raw payload bytes
-            if (hmacSecret == null || hmacSecret.isBlank()) {
-                throw new IllegalStateException("jenkins.webhook.hmac-secret is not configured");
-            }
-            // Compute HMAC-SHA256 over the raw payload bytes
-            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            mac.init(new SecretKeySpec(hmacSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
-            byte[] signatureBytes = mac.doFinal(payloadBytes);
-
-            // Encode signature as lowercase hex: "sha256=<hex>"
-            StringBuilder hexBuilder = new StringBuilder();
-            for (byte b : signatureBytes) {
-                hexBuilder.append(String.format("%02x", b));
-            }
-            String signatureHeader = "sha256=" + hexBuilder;
-
-            // Build and send HTTP POST
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("X-Signature-256", signatureHeader);
+
+            if (secret != null && !secret.isBlank()) {
+                Mac mac = Mac.getInstance(HMAC_ALGORITHM);
+                mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
+                byte[] signatureBytes = mac.doFinal(payloadBytes);
+
+                StringBuilder hexBuilder = new StringBuilder();
+                for (byte b : signatureBytes) {
+                    hexBuilder.append(String.format("%02x", b));
+                }
+                headers.set("X-Signature-256", "sha256=" + hexBuilder);
+                LOGGER.debug("HMAC-SHA256 signature added for URL: {}", callBackUrl);
+            } else {
+                LOGGER.warn("No HMAC secret for callbackUrl [{}] – sending without X-Signature-256 header",
+                        callBackUrl);
+            }
 
             HttpEntity<byte[]> request = new HttpEntity<>(payloadBytes, headers);
             ResponseEntity<String> response = restTemplate.exchange(
@@ -104,5 +101,4 @@ public class JenkinsWebHookService {
             LOGGER.error("Failed to send ResultDTO to Jenkins webhook", e);
         }
     }
-
 }

@@ -39,6 +39,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import com.rdkm.tdkservice.dto.DeviceFreeNotificationDTO;
 import com.rdkm.tdkservice.exception.UserInputException;
 
 /*
@@ -194,6 +195,50 @@ public class HttpService {
 		} catch (RestClientException e) {
 			LOGGER.error("Error during attachment to ticket: {}", ticketKey, e);
 			throw new RuntimeException("Error during attachment to ticket", e);
+		}
+	}
+
+	/**
+	 * Sends a CI app notification POST request to the specified URL with the given
+	 * {@link DeviceFreeNotificationDTO} payload and optional custom headers.
+	 * Use this method instead of {@link #sendPostRequest} for CI app notifications
+	 * as it is free of project-specific (Jira) error-handling logic.
+	 *
+	 * @param url          the CI app callback URL; must not be null or empty
+	 * @param notification the notification payload; must not be null
+	 * @param headers      optional custom headers to include in the request; can be
+	 *                     null
+	 * @return a ResponseEntity containing the response from the CI app
+	 * @throws IllegalArgumentException if the URL or notification payload is null
+	 *                                  or empty
+	 * @throws RuntimeException         if an error occurs during the POST request
+	 */
+	public ResponseEntity<String> sendCIAppNotification(String url, DeviceFreeNotificationDTO notification,
+			Map<String, String> headers) {
+		if (url == null || url.isEmpty()) {
+			LOGGER.error("CI app notification URL is null or empty");
+			throw new IllegalArgumentException("URL must not be null or empty");
+		}
+		if (notification == null) {
+			LOGGER.error("CI app notification payload is null");
+			throw new IllegalArgumentException("Notification payload must not be null");
+		}
+
+		HttpHeaders httpHeaders = new HttpHeaders();
+		httpHeaders.setContentType(MediaType.APPLICATION_JSON);
+		if (headers != null) {
+			headers.forEach(httpHeaders::set);
+		}
+		HttpEntity<DeviceFreeNotificationDTO> entity = new HttpEntity<>(notification, httpHeaders);
+
+		try {
+			LOGGER.info("Sending CI app notification to URL: {} for device: {}", url, notification.getDeviceName());
+			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+			LOGGER.info("CI app notification sent successfully for ciJobId: {}", notification.getCiJobId());
+			return response;
+		} catch (RestClientException e) {
+			LOGGER.error("Error sending CI app notification to URL: {}", url, e);
+			throw new RuntimeException("Error during CI app notification POST request", e);
 		}
 	}
 
