@@ -2,7 +2,7 @@
 * If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
-* Copyright 2024 RDK Management
+* Copyright 2026 RDK Management
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -35,7 +35,8 @@ public class DeviceFreeNotificationDTO {
 
 	/**
 	 * The CI job ID originally passed by the CI app when triggering the execution.
-	 * The CI app uses this to correlate the notification to the exact job it submitted.
+	 * The CI app uses this to correlate the notification to the exact job it
+	 * submitted.
 	 * Null if the execution was not triggered by the CI app.
 	 */
 	private String ciJobId;

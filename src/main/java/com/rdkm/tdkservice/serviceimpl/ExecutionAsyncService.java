@@ -1681,7 +1681,7 @@ public class ExecutionAsyncService {
 			e.printStackTrace();
 			// Unlock the device with the current status
 			deviceStatusService.fetchAndUpdateDeviceStatus(device);
-			LOGGER.error("Error in executing scripts: {} on device: {}", device.getName());
+			LOGGER.error("Error in executing scripts on device: {}", device.getName());
 			throw new TDKServiceException("Error in executing scripts: " + " on device: " + device.getName());
 		} finally {
 			// Unlock the device with the current status
