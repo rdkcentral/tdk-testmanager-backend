@@ -309,7 +309,7 @@ public class DeviceService implements IDeviceService {
 			String configFileName = deviceConfigService.getDeviceConfigFileName(device.getName(),
 					device.getDeviceType().getName(), device.isThunderEnabled());
 			try {
-				deviceConfigService.deleteDeviceConfigFile(configFileName, device.isThunderEnabled());
+				deviceConfigService.deleteDeviceConfigFile(configFileName, device.isThunderEnabled(), device.getCategory().getName());
 			} catch (UserInputException e) {
 				// Config file doesn't exist, which is fine - log and continue
 				LOGGER.info("No device config file found for device: {} - continuing with device deletion",

@@ -60,30 +60,37 @@ public class DeviceConfigService implements IDeviceConfigService {
 	 * 
 	 * @param deviceTypeName - the device name
 	 * @param deviceType     - the device type
+	 * @param isThunderEnabled - whether thunder is enabled (applicable for RDKV)
+	 * @param category       - the RDK flavor category (RDKV or RDKB)
 	 * @return Resource - the device configuration file null - if the device config
 	 *         file is not found
 	 */
 	@Override
-	public Resource getDeviceConfigFile(String deviceTypeName, String deviceType, boolean isThunderEnabled) {
-		LOGGER.info("Inside getDeviceConfigFile method with deviceTypeName: {}, deviceType: {}", deviceTypeName,
-				deviceType);
+	public Resource getDeviceConfigFile(String deviceTypeName, String deviceType, boolean isThunderEnabled, String category) {
+		LOGGER.info("Inside getDeviceConfigFile method with deviceTypeName: {}, deviceType: {}, category: {}", deviceTypeName,
+				deviceType, category);
+		String configDir = resolveConfigDir(isThunderEnabled, category);
 		Resource resource = null;
 
 		// Try to get the device config file for the given deviceType name
 		if (!Utils.isEmpty(deviceTypeName)) {
-			resource = getDeviceConfigFileGivenName(deviceTypeName + Constants.CONFIG_FILE_EXTENSION, isThunderEnabled);
+			resource = getDeviceConfigFileGivenName(deviceTypeName + Constants.CONFIG_FILE_EXTENSION, configDir);
 		}
 
 		// If not found, try to get the device config file for the given deviceType type
 		if (resource == null && !Utils.isEmpty(deviceType)) {
-			resource = getDeviceConfigFileGivenName(deviceType + Constants.CONFIG_FILE_EXTENSION, isThunderEnabled);
+			resource = getDeviceConfigFileGivenName(deviceType + Constants.CONFIG_FILE_EXTENSION, configDir);
 		}
 
 		// If still not found, get the default device config file
-		if (resource == null && isThunderEnabled) {
-			resource = getDeviceConfigFileGivenName(Constants.THUNDER_DEVICE_CONFIG_FILE, isThunderEnabled);
-		} else if (resource == null && !isThunderEnabled) {
-			resource = getDeviceConfigFileGivenName(Constants.DEFAULT_DEVICE_CONFIG_FILE, isThunderEnabled);
+		if (resource == null) {
+			if ("RDKB".equalsIgnoreCase(category)) {
+				resource = getDeviceConfigFileGivenName(Constants.DEFAULT_RDKB_DEVICE_CONFIG_FILE, configDir);
+			} else if (isThunderEnabled) {
+				resource = getDeviceConfigFileGivenName(Constants.THUNDER_DEVICE_CONFIG_FILE, configDir);
+			} else {
+				resource = getDeviceConfigFileGivenName(Constants.DEFAULT_DEVICE_CONFIG_FILE, configDir);
+			}
 		}
 		// Add header to the resource
 		try {
@@ -141,18 +148,17 @@ public class DeviceConfigService implements IDeviceConfigService {
 	 * This method is used to upload the device configuration file
 	 * 
 	 * @param file - the device configuration file
+	 * @param isThunderEnabled - whether thunder is enabled (applicable for RDKV)
+	 * @param category       - the RDK flavor category (RDKV or RDKB)
 	 * @return boolean - true if the device config file is uploaded successfully
 	 *         false - if the device config file is not uploaded successfully
 	 */
-	public boolean uploadDeviceConfigFile(MultipartFile file, boolean isThunderEnabled) {
-		LOGGER.info("Inside uploadDeviceConfigFile method with file: {}", file.getOriginalFilename());
+	public boolean uploadDeviceConfigFile(MultipartFile file, boolean isThunderEnabled, String category) {
+		LOGGER.info("Inside uploadDeviceConfigFile method with file: {}, category: {}", file.getOriginalFilename(), category);
 		validateFile(file);
-		String path = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR;
-		if (isThunderEnabled) {
-			path = path + Constants.THUNDER_DEVICE_CONFIG_DIR + Constants.FILE_PATH_SEPERATOR;
-		} else {
-			path = path + Constants.TDKV_DEVICE_CONFIG_DIR + Constants.FILE_PATH_SEPERATOR;
-		}
+		String configDir = resolveConfigDir(isThunderEnabled, category);
+		String path = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
+				+ configDir + Constants.FILE_PATH_SEPERATOR;
 		try {
 			Path uploadPath = Paths.get(path);
 			if (!Files.exists(uploadPath)) {
@@ -178,19 +184,18 @@ public class DeviceConfigService implements IDeviceConfigService {
 	 * This method is used to delete the device configuration file
 	 * 
 	 * @param deviceConfigFileName - the device configuration file name
+	 * @param isThunderEnabled - whether thunder is enabled (applicable for RDKV)
+	 * @param category       - the RDK flavor category (RDKV or RDKB)
 	 * @return boolean - true if the device config file is deleted successfully
 	 *         false - if the device config file is not deleted
 	 */
 	@Override
-	public boolean deleteDeviceConfigFile(String deviceConfigFileName, boolean isThunderEnabled) {
-		LOGGER.info("Inside deleteDeviceConfigFile method with deviceConfigFileName: {}", deviceConfigFileName);
+	public boolean deleteDeviceConfigFile(String deviceConfigFileName, boolean isThunderEnabled, String category) {
+		LOGGER.info("Inside deleteDeviceConfigFile method with deviceConfigFileName: {}, category: {}", deviceConfigFileName, category);
 
-		String path = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR;
-		if (isThunderEnabled) {
-			path = path + Constants.THUNDER_DEVICE_CONFIG_DIR + Constants.FILE_PATH_SEPERATOR;
-		} else {
-			path = path + Constants.TDKV_DEVICE_CONFIG_DIR + Constants.FILE_PATH_SEPERATOR;
-		}
+		String configDir = resolveConfigDir(isThunderEnabled, category);
+		String path = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
+				+ configDir + Constants.FILE_PATH_SEPERATOR;
 		Path filePath = Paths.get(path).resolve(deviceConfigFileName);
 		try {
 			Files.delete(filePath);
@@ -213,17 +218,14 @@ public class DeviceConfigService implements IDeviceConfigService {
 	 * file name
 	 * 
 	 * @param configFileName - the config file name
+	 * @param configDir      - the config directory name
 	 * @return Resource - the device configuration file null - if the device config
 	 *         file is not found
 	 */
-	private Resource getDeviceConfigFileGivenName(String configFileName, boolean isThunderEnabled) {
-		LOGGER.info("Inside getDeviceConfigFileGivenName method with configFileName: {}", configFileName);
-		String path = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR;
-		if (isThunderEnabled) {
-			path = path + Constants.THUNDER_DEVICE_CONFIG_DIR + Constants.FILE_PATH_SEPERATOR;
-		} else {
-			path = path + Constants.TDKV_DEVICE_CONFIG_DIR + Constants.FILE_PATH_SEPERATOR;
-		}
+	private Resource getDeviceConfigFileGivenName(String configFileName, String configDir) {
+		LOGGER.info("Inside getDeviceConfigFileGivenName method with configFileName: {}, configDir: {}", configFileName, configDir);
+		String path = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
+				+ configDir + Constants.FILE_PATH_SEPERATOR;
 		Path pathFile = Paths.get(path).resolve(configFileName);
 		Resource resource = null;
 		try {
@@ -283,6 +285,22 @@ public class DeviceConfigService implements IDeviceConfigService {
 			return Constants.THUNDER_DEVICE_CONFIG_FILE;
 		} else {
 			return Constants.DEFAULT_DEVICE_CONFIG_FILE;
+		}
+	}
+	/**
+	 * Resolves the config directory based on category and thunder status.
+	 * 
+	 * @param isThunderEnabled - whether thunder is enabled (applicable for RDKV)
+	 * @param category         - the RDK flavor category (RDKV or RDKB)
+	 * @return String - the config directory name
+	 */
+	private String resolveConfigDir(boolean isThunderEnabled, String category) {
+		if ("RDKB".equalsIgnoreCase(category)) {
+			return Constants.TDKB_DEVICE_CONFIG_DIR;
+		} else if (isThunderEnabled) {
+			return Constants.THUNDER_DEVICE_CONFIG_DIR;
+		} else {
+			return Constants.TDKV_DEVICE_CONFIG_DIR;
 		}
 	}
 
