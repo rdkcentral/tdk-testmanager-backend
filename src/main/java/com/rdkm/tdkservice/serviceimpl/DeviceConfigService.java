@@ -164,8 +164,9 @@ public class DeviceConfigService implements IDeviceConfigService {
 			if (!Files.exists(uploadPath)) {
 				Files.createDirectories(uploadPath);
 			}
-			// Save the file to the path
-			Path filePath = uploadPath.resolve(file.getOriginalFilename());
+			// Sanitize filename to prevent path traversal
+			String safeName = Paths.get(file.getOriginalFilename()).getFileName().toString();
+			Path filePath = uploadPath.resolve(safeName);
 
 			Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 			LOGGER.info("File uploaded successfully: {}", file.getOriginalFilename());
@@ -196,7 +197,9 @@ public class DeviceConfigService implements IDeviceConfigService {
 		String configDir = resolveConfigDir(isThunderEnabled, category);
 		String path = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
 				+ configDir + Constants.FILE_PATH_SEPERATOR;
-		Path filePath = Paths.get(path).resolve(deviceConfigFileName);
+		// Sanitize filename to prevent path traversal
+		String safeName = Paths.get(deviceConfigFileName).getFileName().toString();
+		Path filePath = Paths.get(path).resolve(safeName);
 		try {
 			Files.delete(filePath);
 			LOGGER.info("File deleted successfully: {}", deviceConfigFileName);
@@ -226,7 +229,9 @@ public class DeviceConfigService implements IDeviceConfigService {
 		LOGGER.info("Inside getDeviceConfigFileGivenName method with configFileName: {}, configDir: {}", configFileName, configDir);
 		String path = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR
 				+ configDir + Constants.FILE_PATH_SEPERATOR;
-		Path pathFile = Paths.get(path).resolve(configFileName);
+		// Sanitize filename to prevent path traversal
+		String safeConfigFileName = Paths.get(configFileName).getFileName().toString();
+		Path pathFile = Paths.get(path).resolve(safeConfigFileName);
 		Resource resource = null;
 		try {
 			resource = new UrlResource(pathFile.toUri());
@@ -297,10 +302,10 @@ public class DeviceConfigService implements IDeviceConfigService {
 	private String resolveConfigDir(boolean isThunderEnabled, String category) {
 		if ("RDKB".equalsIgnoreCase(category)) {
 			return Constants.TDKB_DEVICE_CONFIG_DIR;
-		} else if (isThunderEnabled) {
-			return Constants.THUNDER_DEVICE_CONFIG_DIR;
+		} else if ("RDKV".equalsIgnoreCase(category)) {
+			return isThunderEnabled ? Constants.THUNDER_DEVICE_CONFIG_DIR : Constants.TDKV_DEVICE_CONFIG_DIR;
 		} else {
-			return Constants.TDKV_DEVICE_CONFIG_DIR;
+			throw new UserInputException("Unsupported category: " + category + ". Expected RDKV or RDKB.");
 		}
 	}
 
