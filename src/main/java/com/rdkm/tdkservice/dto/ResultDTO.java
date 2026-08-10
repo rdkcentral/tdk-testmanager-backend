@@ -33,29 +33,24 @@ import lombok.Data;
 public class ResultDTO {
 
     /**
-     * The name of the CI service.
+     * The CI job ID associated with this request.
      */
-    public String service;
+    public String ciJobId;
+
+    /**
+     * The name of the file associated with this request.
+     */
+    public String buildFileName;
+
+    /**
+     * The status code of the CI request.
+     */
+    public int statusCode;
 
     /**
      * The current status of the CI service.
      */
     public String status;
-
-    /**
-     * The timestamp when the CI service started.
-     */
-    public String started_at;
-
-    /**
-     * The identifier of the user who started the CI service.
-     */
-    public String started_by;
-
-    /**
-     * The duration of the CI service.
-     */
-    public String duration;
 
     /**
      * A list of results from the CI service.
