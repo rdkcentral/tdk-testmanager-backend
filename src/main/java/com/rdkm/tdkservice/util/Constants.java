@@ -55,6 +55,12 @@ public class Constants {
 	// TDKV device config directory inside filestore
 	public static final String TDKV_DEVICE_CONFIG_DIR = "tdkvDeviceConfig";
 
+	// TDKB device config directory inside filestore
+	public static final String TDKB_DEVICE_CONFIG_DIR = "tdkbDeviceConfig";
+
+	// Default RDKB device config file name in filestore
+	public static final String DEFAULT_RDKB_DEVICE_CONFIG_FILE = "sampleDevice.config";
+
 	// Empty string
 	public static final String EMPTY_STRING = "";
 
