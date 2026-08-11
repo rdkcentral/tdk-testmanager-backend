@@ -582,9 +582,6 @@ public class Constants {
 	// TDK portal service name
 	public static final String TDK_PORTAL_SERVICE = "TDK";
 
-	// CI callback URL
-	public static final String CI_CALLBACK_URL = "ci_callback_url";
-
 	// Rdkcertification diagnostics script file
 	public static final String RDK_DIAGNOSIS_LOG_SCRIPT = "rdk_cerfiticate_diagnosis.py";
 
@@ -637,5 +634,19 @@ public class Constants {
 
 	// Constant for the word 'ALL'
 	public static final String ALL = "ALL";
+
+	// CI app notification URL – used to notify the internal CI backend that a
+	// device is free so it can process its queue of pending executions
+	public static final String CI_APP_NOTIFY_URL = "ci_app_notify_url";
+
+	// API endpoint appended to the CI app base URL to form the full notification
+	// URL
+	public static final String CI_APP_NOTIFY_ENDPOINT = "/api/v1/ci/execution/completed";
+
+	// CI app callback registry – key prefix and suffixes used in tm.config
+	// Each entry: ci_app.<name>.callbackUrl and ci_app.<name>.secret
+	public static final String CI_APP_REGISTRY_PREFIX = "ci_app.";
+	public static final String CI_APP_REGISTRY_CALLBACK_URL_SUFFIX = ".callbackUrl";
+	public static final String CI_APP_REGISTRY_SECRET_SUFFIX = ".secret";
 
 }

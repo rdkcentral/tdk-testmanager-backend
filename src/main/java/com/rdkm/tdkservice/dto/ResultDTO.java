@@ -53,8 +53,19 @@ public class ResultDTO {
     public String status;
 
     /**
+     * The UTC timestamp when this response was generated (ISO-8601).
+     */
+    public String timestamp;
+
+    /**
      * A list of results from the CI service.
      */
     public ArrayList<DetailedResultDTO> result;
+
+    /**
+     * URL to download the consolidated Excel report for this execution.
+     * Can be used by the CI app to fetch the full test report after completion.
+     */
+    public String excelReportDownloadUrl;
 
 }

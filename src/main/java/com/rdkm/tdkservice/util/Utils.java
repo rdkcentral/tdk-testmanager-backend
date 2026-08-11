@@ -157,16 +157,17 @@ public class Utils {
 	}
 
 	/**
-	 * Generates a timestamp in UTC formatted as MMDDYYHHMMSS.
+	 * Generates a timestamp in UTC formatted as MMddyyHHmmssSSS.
 	 *
 	 * @return A string representing the current date and time in UTC in the format
-	 *         MMDDYYHHMMSS.
+	 *         MMddyyHHmmssSSS (millisecond precision prevents duplicate execution
+	 *         name collisions when multiple CI triggers fire concurrently).
 	 */
 	public static String getTimeStampInUTCForExecutionName() {
 		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 
-		// Format the date and time in the format MMDDYYHHMMSS
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMddyyHHmmss");
+		// Format the date and time in the format MMddyyHHmmssSSS
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMddyyHHmmssSSS");
 		String formattedDateTime = now.format(formatter);
 		return formattedDateTime;
 
