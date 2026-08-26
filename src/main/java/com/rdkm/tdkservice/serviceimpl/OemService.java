@@ -248,9 +248,10 @@ public class OemService implements IOemService {
 	@Override
 	public String downloadAllOemsXML(String category) {
 		LOGGER.info("Going to download all OEMs as XML for category: " + category);
-		List<Oem> oems = oemRepository.findByCategory(Category.getCategory(category));
+		Category categoryEnum = commonService.validateCategory(category);
+		List<Oem> oems = oemRepository.findByCategory(categoryEnum);
 		if (oems == null || oems.isEmpty()) {
-			throw new TDKServiceException("No OEMs found for category: " + category);
+			throw new ResourceNotFoundException(Constants.OEM_NAME, category);
 		}
 		try {
 			Document document = createOemsXMLDocument(oems);
@@ -266,9 +267,14 @@ public class OemService implements IOemService {
 		LOGGER.info("Going to parse XML for OEM upload");
 		validateXMLFile(file);
 		try {
-			String xmlContent = new String(file.getBytes());
+			String xmlContent = new String(file.getBytes(), StandardCharsets.UTF_8);
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			factory.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
 			factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+			factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+			factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+			factory.setXIncludeAware(false);
+			factory.setExpandEntityReferences(false);
 			DocumentBuilder builder = factory.newDocumentBuilder();
 			Document document = builder.parse(new InputSource(new StringReader(xmlContent)));
 			document.getDocumentElement().normalize();
@@ -280,19 +286,16 @@ public class OemService implements IOemService {
 					Element element = (Element) node;
 					String name = getNodeTextContent(element, "name");
 					String category = getNodeTextContent(element, "category");
-
 					if (name == null || name.isEmpty() || category == null || category.isEmpty()) {
 						continue;
 					}
-
 					OemCreateDTO dto = new OemCreateDTO();
 					dto.setOemName(name);
 					dto.setOemCategory(category);
-
 					try {
 						createOem(dto, false);
-					} catch (ResourceAlreadyExistsException e) {
-						LOGGER.info("OEM already exists: " + name + ", skipping");
+					} catch (Exception e) {
+						LOGGER.info("Exception occurred while creating OEM: " + name, e);
 					}
 				}
 			}

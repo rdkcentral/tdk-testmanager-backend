@@ -270,7 +270,7 @@ public class SocService implements ISocService {
 		}
 		List<Soc> socs = socRepository.findByCategory(categoryName);
 		if (socs == null || socs.isEmpty()) {
-			return null;
+			throw new ResourceNotFoundException(Constants.SOC_NAME, category);
 		}
 		try {
 			Document doc = createSocsXMLDocument(socs);
@@ -295,6 +295,12 @@ public class SocService implements ISocService {
 		try {
 			String xmlData = new String(file.getBytes(), StandardCharsets.UTF_8);
 			DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+			dbFactory.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+			dbFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+			dbFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+			dbFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+			dbFactory.setXIncludeAware(false);
+			dbFactory.setExpandEntityReferences(false);
 			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
 			InputSource is = new InputSource(new StringReader(xmlData));
 			doc = dBuilder.parse(is);
@@ -309,16 +315,37 @@ public class SocService implements ISocService {
 			throw new UserInputException("No soc elements found in the XML file.");
 		}
 
+		int successCount = 0;
+		int skippedCount = 0;
 		for (int i = 0; i < nList.getLength(); i++) {
 			Node nNode = nList.item(i);
 			if (nNode.getNodeType() == Node.ELEMENT_NODE) {
 				Element eElement = (Element) nNode;
+				String name = getNodeTextContent(eElement, "name");
+				String category = getNodeTextContent(eElement, "category");
+
+				if (name == null || name.trim().isEmpty() || category == null || category.trim().isEmpty()) {
+					LOGGER.warn("Skipping soc at index {} due to missing name or category", i);
+					skippedCount++;
+					continue;
+				}
+
 				SocCreateDTO dto = new SocCreateDTO();
-				dto.setSocName(getNodeTextContent(eElement, "name"));
-				dto.setSocCategory(getNodeTextContent(eElement, "category"));
-				createSoc(dto, false);
+				dto.setSocName(name.trim());
+				dto.setSocCategory(category.trim());
+				boolean created = createSoc(dto, false);
+				if (created) {
+					successCount++;
+				} else {
+					skippedCount++;
+				}
 			}
 		}
+
+		if (successCount == 0 && skippedCount > 0) {
+			throw new TDKServiceException("No SOCs were created. All " + skippedCount + " entries were skipped (duplicates or invalid data).");
+		}
+		LOGGER.info("SOC XML upload complete. Created: {}, Skipped: {}", successCount, skippedCount);
 		return true;
 	}
 

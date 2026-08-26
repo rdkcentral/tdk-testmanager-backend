@@ -238,12 +238,9 @@ public class SocController {
 	public ResponseEntity<String> downloadAllSocsXML(@RequestParam String category) {
 		LOGGER.info("Received download all SOCs XML request for category: " + category);
 		String xmlContent = socService.downloadAllSocsXML(category);
-		if (xmlContent == null) {
-			LOGGER.error("No SOCs found for category: " + category);
-			throw new TDKServiceException("No SOCs found for category: " + category);
-		}
 		HttpHeaders headers = new HttpHeaders();
 		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=socs_" + category + ".xml");
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/xml");
 		LOGGER.info("Downloaded SOCs XML successfully");
 		return ResponseEntity.status(HttpStatus.OK).headers(headers).body(xmlContent);
 	}

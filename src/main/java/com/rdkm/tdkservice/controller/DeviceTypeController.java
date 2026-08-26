@@ -278,12 +278,9 @@ public class DeviceTypeController {
 	public ResponseEntity<String> downloadAllDeviceTypesXML(@RequestParam String category) {
 		LOGGER.info("Received download all device types XML request for category: " + category);
 		String xmlContent = deviceTypeService.downloadAllDeviceTypesXML(category);
-		if (xmlContent == null) {
-			LOGGER.error("No device types found for category: " + category);
-			throw new TDKServiceException("No device types found for category: " + category);
-		}
 		HttpHeaders headers = new HttpHeaders();
 		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=device_types_" + category + ".xml");
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/xml");
 		LOGGER.info("Downloaded device types XML successfully");
 		return ResponseEntity.status(HttpStatus.OK).headers(headers).body(xmlContent);
 	}

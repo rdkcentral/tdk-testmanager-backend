@@ -108,6 +108,9 @@ public class DeviceTypeService implements IDeviceTypeService {
 			LOGGER.error("Device type already exists with the same name: " + deviceTypeDTO.getDeviceTypeName());
 			throw new ResourceAlreadyExistsException(Constants.DEVICE_TYPE, deviceTypeDTO.getDeviceTypeName());
 		}
+		if (existsByNameAndCategoryFlag && !exceptionFlag) {
+			return false;
+		}
 		deviceType.setName(deviceTypeDTO.getDeviceTypeName());
 		DeviceTypeCategory deviceTypeCategory = DeviceTypeCategory.getDeviceTypeCategory(deviceTypeDTO.getDeviceType());
 		if (null == deviceTypeCategory) {
@@ -115,26 +118,21 @@ public class DeviceTypeService implements IDeviceTypeService {
 		} else {
 			deviceType.setType(deviceTypeCategory);
 		}
-		if (!exceptionFlag && existsByNameAndCategoryFlag) {
-			return false;
-		} else {
 
-			if (deviceTypeDTO.getDeviceTypeCategory() != null) {
-				deviceType.setCategory(category);
-			}
-
-			UserGroup userGroup = userGroupRepository.findByName(deviceTypeDTO.getDeviceTypeUserGroup());
-			deviceType.setUserGroup(userGroup);
-
-			try {
-				deviceType = deviceTypeRepository.save(deviceType);
-
-			} catch (Exception e) {
-				LOGGER.error("Error occurred while creating Device Type", e);
-				return false;
-			}
-			LOGGER.info("DeviceType creation completed");
+		if (deviceTypeDTO.getDeviceTypeCategory() != null) {
+			deviceType.setCategory(category);
 		}
+
+		UserGroup userGroup = userGroupRepository.findByName(deviceTypeDTO.getDeviceTypeUserGroup());
+		deviceType.setUserGroup(userGroup);
+
+		try {
+			deviceType = deviceTypeRepository.save(deviceType);
+		} catch (Exception e) {
+			LOGGER.error("Error occurred while creating Device Type", e);
+			return false;
+		}
+		LOGGER.info("DeviceType creation completed");
 		return deviceType != null && deviceType.getId() != null;
 	}
 
@@ -300,7 +298,7 @@ public class DeviceTypeService implements IDeviceTypeService {
 		Category categoryEnum = commonService.validateCategory(category);
 		List<DeviceType> deviceTypes = deviceTypeRepository.findByCategory(categoryEnum);
 		if (deviceTypes.isEmpty()) {
-			return null;
+			throw new ResourceNotFoundException(Constants.DEVICE_TYPE, category);
 		}
 		try {
 			Document doc = createDeviceTypesXMLDocument(deviceTypes);
@@ -325,6 +323,12 @@ public class DeviceTypeService implements IDeviceTypeService {
 		try {
 			String xmlData = new String(file.getBytes(), StandardCharsets.UTF_8);
 			DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+			dbFactory.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+			dbFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+			dbFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+			dbFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+			dbFactory.setXIncludeAware(false);
+			dbFactory.setExpandEntityReferences(false);
 			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
 			InputSource is = new InputSource(new StringReader(xmlData));
 			doc = dBuilder.parse(is);
