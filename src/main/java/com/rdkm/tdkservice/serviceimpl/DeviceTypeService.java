@@ -305,7 +305,7 @@ public class DeviceTypeService implements IDeviceTypeService {
 			return convertDocumentToString(doc);
 		} catch (Exception e) {
 			LOGGER.error("Error generating device types XML for category: " + category, e);
-			throw new TDKServiceException("Error generating device types XML for category: " + category);
+			throw new TDKServiceException("Error generating device types XML for category: ");
 		}
 	}
 

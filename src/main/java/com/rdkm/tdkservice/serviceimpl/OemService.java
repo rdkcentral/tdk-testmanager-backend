@@ -22,7 +22,7 @@ package com.rdkm.tdkservice.serviceimpl;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
+import java.nio.charset.StandardCharsets;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -30,7 +30,6 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,10 +41,8 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
-
 import java.io.StringReader;
 import java.io.StringWriter;
-
 import com.rdkm.tdkservice.dto.OemCreateDTO;
 import com.rdkm.tdkservice.dto.OemDTO;
 import com.rdkm.tdkservice.enums.Category;
@@ -302,7 +299,7 @@ public class OemService implements IOemService {
 			return true;
 		} catch (Exception e) {
 			LOGGER.error("Error occurred while parsing OEM XML", e);
-			throw new TDKServiceException("Error in parsing OEM XML: " + e.getMessage());
+			throw new TDKServiceException("Error in parsing OEM XML: ");
 		}
 	}
 

@@ -306,7 +306,7 @@ public class SocService implements ISocService {
 			doc = dBuilder.parse(is);
 		} catch (Exception e) {
 			LOGGER.error("Error parsing XML file", e);
-			throw new TDKServiceException("Error parsing XML file: " + e.getMessage());
+			throw new TDKServiceException("Error parsing XML file: ");
 		}
 
 		NodeList nList = doc.getElementsByTagName("soc");
