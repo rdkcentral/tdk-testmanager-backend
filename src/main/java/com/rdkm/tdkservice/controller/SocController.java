@@ -25,6 +25,8 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -36,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.rdkm.tdkservice.dto.SocCreateDTO;
 import com.rdkm.tdkservice.dto.SocDTO;
@@ -77,7 +80,7 @@ public class SocController {
 	@PostMapping("/create")
 	public ResponseEntity<Response> createSoc(@RequestBody @Valid SocCreateDTO socDTO) {
 		LOGGER.info("Received create soc request: " + socDTO.toString());
-		boolean isSocVendorCreated = socService.createSoc(socDTO);
+		boolean isSocVendorCreated = socService.createSoc(socDTO, true);
 		if (isSocVendorCreated) {
 			LOGGER.info("Soc created succesfully");
 			return ResponseUtils.getCreatedResponse("SoC created succesfully");
@@ -219,6 +222,53 @@ public class SocController {
 			return ResponseUtils.getSuccessDataResponse("No SOC found for the category", socsList);
 		}
 
+	}
+
+	/**
+	 * Downloads all SOCs by category as a single XML file.
+	 *
+	 * @param category the category of the SOCs to download
+	 * @return a ResponseEntity containing the XML content
+	 */
+	@Operation(summary = "Download all SOCs by category as XML", description = "Downloads all SOCs for a given category as a single XML file.")
+	@ApiResponse(responseCode = "200", description = "SOCs XML downloaded successfully")
+	@ApiResponse(responseCode = "404", description = "No SOCs found for the category")
+	@ApiResponse(responseCode = "500", description = "Error generating SOCs XML")
+	@GetMapping("/downloadXML")
+	public ResponseEntity<String> downloadAllSocsXML(@RequestParam String category) {
+		LOGGER.info("Received download all SOCs XML request for category: " + category);
+		String xmlContent = socService.downloadAllSocsXML(category);
+		if (xmlContent == null) {
+			LOGGER.error("No SOCs found for category: " + category);
+			throw new TDKServiceException("No SOCs found for category: " + category);
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=socs_" + category + ".xml");
+		LOGGER.info("Downloaded SOCs XML successfully");
+		return ResponseEntity.status(HttpStatus.OK).headers(headers).body(xmlContent);
+	}
+
+	/**
+	 * Uploads a SOC XML file for bulk import.
+	 *
+	 * @param file the XML file containing SOC definitions
+	 * @return a ResponseEntity with the result of the upload
+	 */
+	@Operation(summary = "Upload SOC XML File", description = "Upload a SOC XML file for bulk import.")
+	@ApiResponse(responseCode = "201", description = "SOCs created successfully from XML data")
+	@ApiResponse(responseCode = "500", description = "Failed to create SOCs from XML data")
+	@ApiResponse(responseCode = "400", description = "Bad request")
+	@PostMapping("/uploadxml")
+	public ResponseEntity<Response> uploadSocXML(@Valid @RequestParam("file") MultipartFile file) {
+		LOGGER.info("Received upload SOC XML request: " + file.getOriginalFilename());
+		boolean isUploaded = socService.parseXMLForSoc(file);
+		if (isUploaded) {
+			LOGGER.info("SOCs created successfully from XML data");
+			return ResponseUtils.getCreatedResponse("SOCs created successfully from XML data");
+		} else {
+			LOGGER.error("Failed to create SOCs from XML data");
+			throw new TDKServiceException("Could not upload the xml file");
+		}
 	}
 
 }

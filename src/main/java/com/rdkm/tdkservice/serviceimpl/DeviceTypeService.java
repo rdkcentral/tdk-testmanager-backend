@@ -19,15 +19,34 @@ http://www.apache.org/licenses/LICENSE-2.0
 */
 package com.rdkm.tdkservice.serviceimpl;
 
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 import com.rdkm.tdkservice.dto.DeviceTypeCreateDTO;
 import com.rdkm.tdkservice.dto.DeviceTypeDTO;
@@ -36,6 +55,8 @@ import com.rdkm.tdkservice.enums.DeviceTypeCategory;
 import com.rdkm.tdkservice.exception.DeleteFailedException;
 import com.rdkm.tdkservice.exception.ResourceAlreadyExistsException;
 import com.rdkm.tdkservice.exception.ResourceNotFoundException;
+import com.rdkm.tdkservice.exception.TDKServiceException;
+import com.rdkm.tdkservice.exception.UserInputException;
 import com.rdkm.tdkservice.model.DeviceType;
 import com.rdkm.tdkservice.model.UserGroup;
 import com.rdkm.tdkservice.repository.DeviceRepositroy;
@@ -77,39 +98,43 @@ public class DeviceTypeService implements IDeviceTypeService {
 	 *         false otherwise.
 	 */
 	@Override
-	public boolean createDeviceType(DeviceTypeCreateDTO deviceTypeDTO) {
+	public boolean createDeviceType(DeviceTypeCreateDTO deviceTypeDTO, boolean exceptionFlag) {
 		LOGGER.info("Going to create DeviceType");
+		DeviceType deviceType = new DeviceType();
 		Category category = Category.getCategory(deviceTypeDTO.getDeviceTypeCategory());
-		if (deviceTypeRepository.existsByNameAndCategory(deviceTypeDTO.getDeviceTypeName(), category)) {
+		boolean existsByNameAndCategoryFlag = deviceTypeRepository
+				.existsByNameAndCategory(deviceTypeDTO.getDeviceTypeName(), category);
+		if (existsByNameAndCategoryFlag && exceptionFlag) {
 			LOGGER.error("Device type already exists with the same name: " + deviceTypeDTO.getDeviceTypeName());
 			throw new ResourceAlreadyExistsException(Constants.DEVICE_TYPE, deviceTypeDTO.getDeviceTypeName());
 		}
-
-		DeviceType deviceType = new DeviceType();
 		deviceType.setName(deviceTypeDTO.getDeviceTypeName());
-
 		DeviceTypeCategory deviceTypeCategory = DeviceTypeCategory.getDeviceTypeCategory(deviceTypeDTO.getDeviceType());
 		if (null == deviceTypeCategory) {
 			throw new ResourceNotFoundException(Constants.DEVICE_TYPE_TYPE, deviceTypeDTO.getDeviceType());
 		} else {
 			deviceType.setType(deviceTypeCategory);
 		}
-
-		if (deviceTypeDTO.getDeviceTypeCategory() != null) {
-			deviceType.setCategory(category);
-		}
-
-		UserGroup userGroup = userGroupRepository.findByName(deviceTypeDTO.getDeviceTypeUserGroup());
-		deviceType.setUserGroup(userGroup);
-
-		try {
-			deviceType = deviceTypeRepository.save(deviceType);
-
-		} catch (Exception e) {
-			LOGGER.error("Error occurred while creating Device Type", e);
+		if (!exceptionFlag && existsByNameAndCategoryFlag) {
 			return false;
+		} else {
+
+			if (deviceTypeDTO.getDeviceTypeCategory() != null) {
+				deviceType.setCategory(category);
+			}
+
+			UserGroup userGroup = userGroupRepository.findByName(deviceTypeDTO.getDeviceTypeUserGroup());
+			deviceType.setUserGroup(userGroup);
+
+			try {
+				deviceType = deviceTypeRepository.save(deviceType);
+
+			} catch (Exception e) {
+				LOGGER.error("Error occurred while creating Device Type", e);
+				return false;
+			}
+			LOGGER.info("DeviceType creation completed");
 		}
-		LOGGER.info("DeviceType creation completed");
 		return deviceType != null && deviceType.getId() != null;
 	}
 
@@ -261,6 +286,139 @@ public class DeviceTypeService implements IDeviceTypeService {
 		LOGGER.trace("Converting DeviceTypeDTO to DeviceType");
 		return MapperUtils.convertToDeviceTypeDTO(deviceType);
 
+	}
+
+	/**
+	 * Downloads all device types by category as a single XML file.
+	 * 
+	 * @param category The category of the device types to download.
+	 * @return String containing XML content of all device types.
+	 */
+	@Override
+	public String downloadAllDeviceTypesXML(String category) {
+		LOGGER.info("Downloading all device types for category: {}", category);
+		Category categoryEnum = commonService.validateCategory(category);
+		List<DeviceType> deviceTypes = deviceTypeRepository.findByCategory(categoryEnum);
+		if (deviceTypes.isEmpty()) {
+			return null;
+		}
+		try {
+			Document doc = createDeviceTypesXMLDocument(deviceTypes);
+			return convertDocumentToString(doc);
+		} catch (Exception e) {
+			LOGGER.error("Error generating device types XML for category: " + category, e);
+			throw new TDKServiceException("Error generating device types XML for category: " + category);
+		}
+	}
+
+	/**
+	 * Parses an uploaded XML file and creates device types from it (bulk import).
+	 * 
+	 * @param file The XML file containing device type definitions.
+	 * @return boolean true if the device types were created successfully.
+	 */
+	@Override
+	public boolean parseXMLForDeviceType(MultipartFile file) {
+		LOGGER.info("Parsing XML file for device type details");
+		validateXMLFile(file);
+		Document doc;
+		try {
+			String xmlData = new String(file.getBytes(), StandardCharsets.UTF_8);
+			DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+			InputSource is = new InputSource(new StringReader(xmlData));
+			doc = dBuilder.parse(is);
+		} catch (Exception e) {
+			LOGGER.error("Error parsing XML file", e);
+			throw new TDKServiceException("Error parsing XML file: " + e.getMessage());
+		}
+
+		NodeList nList = doc.getElementsByTagName("deviceType");
+		if (nList.getLength() == 0) {
+			LOGGER.error("No deviceType elements found in the XML file");
+			throw new UserInputException("No deviceType elements found in the XML file.");
+		}
+
+		for (int i = 0; i < nList.getLength(); i++) {
+			Node nNode = nList.item(i);
+			if (nNode.getNodeType() == Node.ELEMENT_NODE) {
+				Element eElement = (Element) nNode;
+				DeviceTypeCreateDTO dto = new DeviceTypeCreateDTO();
+				dto.setDeviceTypeName(getNodeTextContent(eElement, "name"));
+				dto.setDeviceType(getNodeTextContent(eElement, "type"));
+				dto.setDeviceTypeCategory(getNodeTextContent(eElement, "category"));
+				createDeviceType(dto, false);
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Creates an XML document containing all device types.
+	 */
+	private Document createDeviceTypesXMLDocument(List<DeviceType> deviceTypes) throws ParserConfigurationException {
+		DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+		DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+		Document doc = dBuilder.newDocument();
+
+		Element rootElement = doc.createElement("deviceTypes");
+		doc.appendChild(rootElement);
+
+		for (DeviceType deviceType : deviceTypes) {
+			Element dtElement = doc.createElement("deviceType");
+			rootElement.appendChild(dtElement);
+
+			Element nameEl = doc.createElement("name");
+			nameEl.setTextContent(deviceType.getName());
+			dtElement.appendChild(nameEl);
+
+			Element typeEl = doc.createElement("type");
+			typeEl.setTextContent(deviceType.getType() != null ? deviceType.getType().getName() : "");
+			dtElement.appendChild(typeEl);
+
+			Element categoryEl = doc.createElement("category");
+			categoryEl.setTextContent(deviceType.getCategory() != null ? deviceType.getCategory().getName() : "");
+			dtElement.appendChild(categoryEl);
+		}
+
+		return doc;
+	}
+
+	/**
+	 * Converts a Document to its String representation.
+	 */
+	private String convertDocumentToString(Document doc) throws TransformerException {
+		TransformerFactory transformerFactory = TransformerFactory.newInstance();
+		Transformer transformer = transformerFactory.newTransformer();
+		transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+		DOMSource source = new DOMSource(doc);
+		StringWriter writer = new StringWriter();
+		StreamResult result = new StreamResult(writer);
+		transformer.transform(source, result);
+		return writer.toString();
+	}
+
+	/**
+	 * Gets the text content of a node in an XML element.
+	 */
+	private String getNodeTextContent(Element eElement, String tagName) {
+		Node node = eElement.getElementsByTagName(tagName).item(0);
+		return node != null ? node.getTextContent() : null;
+	}
+
+	/**
+	 * Validates the uploaded XML file.
+	 */
+	private void validateXMLFile(MultipartFile file) {
+		String fileName = file.getOriginalFilename();
+		if (fileName == null || !fileName.endsWith(Constants.XML_EXTENSION)) {
+			LOGGER.error("The uploaded file must have a .xml extension {}", fileName);
+			throw new UserInputException("The uploaded file must be a .xml file.");
+		}
+		if (file.isEmpty()) {
+			LOGGER.error("The uploaded file is empty");
+			throw new UserInputException("The uploaded file is empty.");
+		}
 	}
 
 }

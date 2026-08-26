@@ -25,6 +25,8 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -36,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.rdkm.tdkservice.dto.DeviceTypeCreateDTO;
 import com.rdkm.tdkservice.dto.DeviceTypeDTO;
@@ -86,7 +89,7 @@ public class DeviceTypeController {
 	@PostMapping("/create")
 	public ResponseEntity<Response> createDeviceType(@RequestBody @Valid DeviceTypeCreateDTO deviceTypeDTO) {
 		LOGGER.info("Received create device type request: " + deviceTypeDTO.toString());
-		boolean isDeviceTypeCreated = deviceTypeService.createDeviceType(deviceTypeDTO);
+		boolean isDeviceTypeCreated = deviceTypeService.createDeviceType(deviceTypeDTO, true);
 		if (isDeviceTypeCreated) {
 			LOGGER.info("device type created successfully");
 			return ResponseUtils.getCreatedResponse("Device Type created successfully");
@@ -258,6 +261,53 @@ public class DeviceTypeController {
 		} else {
 			LOGGER.error("No device types found");
 			return ResponseUtils.getSuccessDataResponse("No device types found", deviceTypeDTO);
+		}
+	}
+
+	/**
+	 * Downloads all device types by category as a single XML file.
+	 *
+	 * @param category the category of the device types to download
+	 * @return a ResponseEntity containing the XML content
+	 */
+	@Operation(summary = "Download all device types by category as XML", description = "Downloads all device types for a given category as a single XML file.")
+	@ApiResponse(responseCode = "200", description = "Device types XML downloaded successfully")
+	@ApiResponse(responseCode = "404", description = "No device types found for the category")
+	@ApiResponse(responseCode = "500", description = "Error generating device types XML")
+	@GetMapping("/downloadXML")
+	public ResponseEntity<String> downloadAllDeviceTypesXML(@RequestParam String category) {
+		LOGGER.info("Received download all device types XML request for category: " + category);
+		String xmlContent = deviceTypeService.downloadAllDeviceTypesXML(category);
+		if (xmlContent == null) {
+			LOGGER.error("No device types found for category: " + category);
+			throw new TDKServiceException("No device types found for category: " + category);
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=device_types_" + category + ".xml");
+		LOGGER.info("Downloaded device types XML successfully");
+		return ResponseEntity.status(HttpStatus.OK).headers(headers).body(xmlContent);
+	}
+
+	/**
+	 * Uploads a device type XML file for bulk import.
+	 *
+	 * @param file the XML file containing device type definitions
+	 * @return a ResponseEntity with the result of the upload
+	 */
+	@Operation(summary = "Upload device type XML File", description = "Upload a device type XML file for bulk import.")
+	@ApiResponse(responseCode = "201", description = "Device types created successfully from XML data")
+	@ApiResponse(responseCode = "500", description = "Failed to create device types from XML data")
+	@ApiResponse(responseCode = "400", description = "Bad request")
+	@PostMapping("/uploadxml")
+	public ResponseEntity<Response> uploadDeviceTypeXML(@Valid @RequestParam("file") MultipartFile file) {
+		LOGGER.info("Received upload device type XML request: " + file.getOriginalFilename());
+		boolean isUploaded = deviceTypeService.parseXMLForDeviceType(file);
+		if (isUploaded) {
+			LOGGER.info("Device types created successfully from XML data");
+			return ResponseUtils.getCreatedResponse("Device types created successfully from XML data");
+		} else {
+			LOGGER.error("Failed to create device types from XML data");
+			throw new TDKServiceException("Could not upload the xml file");
 		}
 	}
 
