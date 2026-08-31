@@ -38,6 +38,6 @@ public interface ExecutionMethodResultRepository extends JpaRepository<Execution
 	 * @param executionResult the execution result
 	 * @return the list of execution method result
 	 */
-	List<ExecutionMethodResult> findByExecutionResult(ExecutionResult executionResult);
+	List<ExecutionMethodResult> findByExecutionResultOrderByCreatedDateAsc(ExecutionResult executionResult);
 
 }
