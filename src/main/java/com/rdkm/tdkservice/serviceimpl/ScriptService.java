@@ -286,6 +286,9 @@ public class ScriptService implements IScriptService {
 		Script script = scriptRepository.findById(scriptUpdateDTO.getId()).orElseThrow(
 				() -> new ResourceNotFoundException(Constants.SCRIPT_ID, scriptUpdateDTO.getId().toString()));
 
+		// Capture the old name before any changes for file cleanup during rename
+		String oldName = script.getName();
+
 		boolean hasEntityChanges = checkIfEntityChangesExist(scriptUpdateDTO, script);
 		if (!hasEntityChanges) {
 			this.updateScriptFileOnly(scriptFile, scriptUpdateDTO, script);
@@ -294,12 +297,13 @@ public class ScriptService implements IScriptService {
 		// Check if the script name is being updated and if it already exists in the
 		// database
 		if (!Utils.isEmpty(scriptUpdateDTO.getName())) {
-			Script newScript = scriptRepository.findByName(scriptUpdateDTO.getName());
-			if (newScript != null && scriptUpdateDTO.getName().equalsIgnoreCase(script.getName())) {
+			if (scriptUpdateDTO.getName().equalsIgnoreCase(script.getName())) {
+				// Same name (possibly different case) — just set it
 				script.setName(scriptUpdateDTO.getName());
 			} else {
+				// Different name — check for conflicts with other scripts
 				if (scriptRepository.existsByName(scriptUpdateDTO.getName())) {
-					LOGGER.info("Module already exists with the same name: " + scriptUpdateDTO.getName());
+					LOGGER.info("Script already exists with the same name: " + scriptUpdateDTO.getName());
 					throw new ResourceAlreadyExistsException(Constants.SCRIPT, scriptUpdateDTO.getName());
 				} else {
 					script.setName(scriptUpdateDTO.getName());
@@ -307,7 +311,7 @@ public class ScriptService implements IScriptService {
 			}
 		}
 
-		return this.updateTheGivenScriptAndFile(scriptFile, scriptUpdateDTO, script);
+		return this.updateTheGivenScriptAndFile(scriptFile, scriptUpdateDTO, script, oldName);
 
 	}
 
@@ -322,7 +326,15 @@ public class ScriptService implements IScriptService {
 	 * @return true if the script was updated successfully, false otherwise
 	 */
 	private boolean updateScriptFromXML(MultipartFile scriptFile, ScriptDTO scriptUpdateDTO, Script script) {
-		return this.updateTheGivenScriptAndFile(scriptFile, scriptUpdateDTO, script);
+		String oldName = script.getName();
+		// For XML update, set the new name on the entity before calling the common method
+		if (!Utils.isEmpty(scriptUpdateDTO.getName()) && !scriptUpdateDTO.getName().equals(script.getName())) {
+			if (scriptRepository.existsByName(scriptUpdateDTO.getName())) {
+				throw new ResourceAlreadyExistsException(Constants.SCRIPT, scriptUpdateDTO.getName());
+			}
+			script.setName(scriptUpdateDTO.getName());
+		}
+		return this.updateTheGivenScriptAndFile(scriptFile, scriptUpdateDTO, script, oldName);
 	}
 
 	/**
@@ -334,7 +346,8 @@ public class ScriptService implements IScriptService {
 	 * @param script          - the script entity to be updated
 	 * @return true if the script was updated successfully, false otherwise
 	 */
-	private boolean updateTheGivenScriptAndFile(MultipartFile scriptFile, ScriptDTO scriptUpdateDTO, Script script) {
+	private boolean updateTheGivenScriptAndFile(MultipartFile scriptFile, ScriptDTO scriptUpdateDTO, Script script,
+			String oldName) {
 
 		// Get the primitive test based on the primitive test name
 		PrimitiveTest primitiveTest = primitiveTestRepository.findByName(scriptUpdateDTO.getPrimitiveTestName());
@@ -364,12 +377,23 @@ public class ScriptService implements IScriptService {
 		Category category = this.getCategoryBasedOnModule(module);
 		script.setCategory(category);
 
+		// Determine if the script name has been renamed
+		boolean isRenamed = oldName != null && !oldName.equals(script.getName());
+
 		// Get script location based on the module and category
 		String scriptLocation = this.getScriptLocation(module, category);
-		if (scriptLocation != script.getScriptLocation()) {
-			this.deleteScriptFile(script.getName(), script.getScriptLocation());
+		String oldScriptLocation = script.getScriptLocation();
+		boolean isLocationChanged = !scriptLocation.equals(oldScriptLocation);
+
+		if (isLocationChanged) {
+			// Location changed — delete old file using old name at old location
+			this.deleteScriptFile(oldName, oldScriptLocation);
 			script.setScriptLocation(scriptLocation);
+		} else if (isRenamed) {
+			// Same location but name changed — delete old file by old name
+			this.deleteScriptFile(oldName, oldScriptLocation);
 		}
+
 		// Updating the script entity with the updated script details
 		script = MapperUtils.updateScript(script, scriptUpdateDTO);
 
@@ -390,7 +414,7 @@ public class ScriptService implements IScriptService {
 		// If the script file is updated, validate and save the new script file
 		if (!scriptFile.isEmpty()) {
 			this.validateScriptFile(scriptFile, script.getName(), script.getScriptLocation());
-			// This will replave the existing file with the new file
+			// This will replace the existing file with the new file
 			this.saveScriptFile(scriptFile, script.getScriptLocation());
 		}
 
@@ -1093,8 +1117,21 @@ public class ScriptService implements IScriptService {
 		// Process the extracted files (common logic for both ZIP and TAR.GZ)
 		if (pythonFile != null && scriptCreateDTO != null) {
 			String scriptName = scriptCreateDTO.getName();
-			Script script = scriptRepository.findByName(scriptName);
 			boolean saveOrUpdateScript = false;
+
+			// Use script ID first to find existing script (supports rename via ZIP upload)
+			Script script = null;
+			if (scriptId != null && !scriptId.isEmpty()) {
+				try {
+					script = scriptRepository.findById(UUID.fromString(scriptId)).orElse(null);
+				} catch (IllegalArgumentException e) {
+					LOGGER.warn("Invalid script ID in XML: {}", scriptId);
+				}
+			}
+			// Fall back to name-based lookup if ID didn't match
+			if (script == null) {
+				script = scriptRepository.findByName(scriptName);
+			}
 
 			if (script == null) {
 				LOGGER.info("Script going to be saved as new: " + scriptName);
@@ -2654,6 +2691,9 @@ public class ScriptService implements IScriptService {
 		}
 
 		try {
+			// Extract script ID from XML for id-first matching
+			String scriptId = extractScriptIDFromXml(new ByteArrayInputStream(xmlContent));
+
 			// Reuse existing methods
 			ScriptCreateDTO scriptCreateDTO = convertXmlToScriptCreateDTO(
 					new ByteArrayInputStream(xmlContent));
@@ -2662,8 +2702,20 @@ public class ScriptService implements IScriptService {
 					new ByteArrayInputStream(pythonContent),
 					pythonFileName);
 
-			// Check if script exists and save/update
-			Script existingScript = scriptRepository.findByName(scriptName);
+			// Use script ID first to find existing script (supports rename)
+			Script existingScript = null;
+			if (scriptId != null && !scriptId.isEmpty()) {
+				try {
+					existingScript = scriptRepository.findById(UUID.fromString(scriptId)).orElse(null);
+				} catch (IllegalArgumentException e) {
+					LOGGER.warn("Invalid script ID in XML: {}", scriptId);
+				}
+			}
+			// Fall back to name-based lookup if ID didn't match
+			if (existingScript == null) {
+				existingScript = scriptRepository.findByName(scriptName);
+			}
+
 			if (existingScript != null) {
 				ScriptDTO scriptDTO = MapperUtils.convertToScriptDTOForXMLUpdate(scriptCreateDTO, existingScript);
 				return updateScriptFromXML(pythonFile, scriptDTO, existingScript);
