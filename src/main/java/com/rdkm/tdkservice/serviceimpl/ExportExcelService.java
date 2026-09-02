@@ -1612,7 +1612,7 @@ public class ExportExcelService implements IExportExcelService {
 
 							// Fetch ExecutionMethodResults based on ExecutionResult
 							List<ExecutionMethodResult> executionMethodResultList = executionMethodResultRepository
-									.findByExecutionResultOrderByCreatedDateAsc(executionResult);
+									.findByExecutionResultOrderByCreatedDateAscIdAsc(executionResult);
 
 							if (executionMethodResultList != null && !executionMethodResultList.isEmpty()) {
 								row = rawSheet.createRow(rowNum++);
@@ -1798,7 +1798,7 @@ public class ExportExcelService implements IExportExcelService {
 			device.appendChild(scripts);
 
 			List<ExecutionMethodResult> executionMethodResultList = executionMethodResultRepository
-					.findByExecutionResultOrderByCreatedDateAsc(MapperUtils.convertToExecutionResult(executionResult)); // Fetch function
+					.findByExecutionResultOrderByCreatedDateAscIdAsc(MapperUtils.convertToExecutionResult(executionResult)); // Fetch function
 			// details
 
 			for (ExecutionMethodResult executionMethodResultInstance : executionMethodResultList) {

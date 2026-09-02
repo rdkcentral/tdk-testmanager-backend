@@ -1548,7 +1548,8 @@ public class ExecutionService implements IExecutionService {
 
 		List<ExecutionMethodResult> methodResults;
 		try {
-			methodResults = executionMethodResultRepository.findByExecutionResultOrderByCreatedDateAsc(executionResult);
+			methodResults = executionMethodResultRepository
+					.findByExecutionResultOrderByCreatedDateAscIdAsc(executionResult);
 			int methodCount = methodResults.size();
 			response.setTestCaseCount(methodCount);
 
@@ -1856,7 +1857,7 @@ public class ExecutionService implements IExecutionService {
 			List<ExecutionResult> executionResults = executionResultRepository.findByExecution(execution);
 			for (ExecutionResult executionResult : executionResults) {
 				List<ExecutionMethodResult> executionMethodResults = executionMethodResultRepository
-						.findByExecutionResultOrderByCreatedDateAsc(executionResult);
+						.findByExecutionResult(executionResult);
 				if (executionMethodResults != null && !executionMethodResults.isEmpty()) {
 					executionMethodResultRepository.deleteAll(executionMethodResults);
 				}

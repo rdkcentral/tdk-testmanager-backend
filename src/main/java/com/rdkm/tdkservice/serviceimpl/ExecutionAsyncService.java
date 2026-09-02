@@ -1536,7 +1536,7 @@ public class ExecutionAsyncService {
 
 			// Delete all ExecutionMethodResults under the ExecutionResult
 			List<ExecutionMethodResult> executionMethodResults = executionMethodResultRepository
-					.findByExecutionResultOrderByCreatedDateAsc(executionResult);
+					.findByExecutionResult(executionResult);
 			if (executionMethodResults != null && !executionMethodResults.isEmpty()) {
 				executionMethodResultRepository.deleteAll(executionMethodResults);
 			}

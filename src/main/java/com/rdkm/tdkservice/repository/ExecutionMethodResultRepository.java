@@ -33,11 +33,20 @@ import com.rdkm.tdkservice.model.ExecutionResult;
 public interface ExecutionMethodResultRepository extends JpaRepository<ExecutionMethodResult, UUID> {
 
 	/**
+	 * Find the execution method result by execution result and order by created date
+	 * with a secondary ID sort for deterministic ordering when timestamps tie.
+	 * 
+	 * @param executionResult the execution result
+	 * @return the list of execution method result
+	 */
+	List<ExecutionMethodResult> findByExecutionResultOrderByCreatedDateAscIdAsc(ExecutionResult executionResult);
+
+	/**
 	 * Find the execution method result by execution result.
 	 * 
 	 * @param executionResult the execution result
 	 * @return the list of execution method result
 	 */
-	List<ExecutionMethodResult> findByExecutionResultOrderByCreatedDateAsc(ExecutionResult executionResult);
+	List<ExecutionMethodResult> findByExecutionResult(ExecutionResult executionResult);
 
 }
