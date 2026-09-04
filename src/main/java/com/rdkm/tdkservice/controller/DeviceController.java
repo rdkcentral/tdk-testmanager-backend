@@ -271,11 +271,13 @@ public class DeviceController {
 	}
 
 	/**
-	 * This method is used to download the device configuration file exclusively for
-	 * RDKV devices and the related usecases
+	 * This method is used to download the device configuration file for
+	 * both RDKV and RDKB devices.
 	 *
-	 * @param deviceTypeName - the deviceType name
-	 * @param deviceType     - the device type
+	 * @param deviceTypeName   - the deviceType name
+	 * @param deviceType       - the device type
+	 * @param isThunderEnabled - whether thunder is enabled (defaults to false, applicable for RDKV)
+	 * @param category         - the RDK flavor category (RDKV or RDKB)
 	 * @return ResponseEntity<Resource> - the response entity - HttpStatus.OK - if
 	 *         the file download is successful - HttpStatus.NOT_FOUND - if the file
 	 *         is not found
@@ -284,12 +286,14 @@ public class DeviceController {
 	@Operation(summary = "Download device configuration file", description = "Download the device configuration file for a specific device in the system.")
 	@ApiResponse(responseCode = "200", description = "Device configuration file downloaded successfully")
 	@ApiResponse(responseCode = "500", description = "Internal server error in downloading device configuration file")
-	@ApiResponse(responseCode = "400", description = "There is no file associated with the  deviceType and no default file found.")
+	@ApiResponse(responseCode = "400", description = "There is no file associated with the deviceType and no default file found.")
 	@GetMapping("/downloadDeviceConfigFile")
 	public ResponseEntity<Resource> downloadDeviceConfigFile(@RequestParam String deviceTypeName,
-			@RequestParam String deviceType, @RequestParam boolean isThunderEnabled) {
-		LOGGER.info("Going to get the device config file " + deviceTypeName + " " + deviceTypeName);
-		Resource resource = deviceConfigService.getDeviceConfigFile(deviceTypeName, deviceType, isThunderEnabled);
+			@RequestParam String deviceType,
+			@RequestParam(defaultValue = "false") boolean isThunderEnabled,
+			@RequestParam String category) {
+		LOGGER.info("Going to get the device config file " + deviceTypeName + " " + deviceType + " category: " + category);
+		Resource resource = deviceConfigService.getDeviceConfigFile(deviceTypeName, deviceType, isThunderEnabled, category);
 		if (resource == null) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
 		} else {
@@ -301,11 +305,13 @@ public class DeviceController {
 	}
 
 	/**
-	 * This method is used to upload the device configuration file exclusively for
-	 * RDKV devices and the related usecases
+	 * This method is used to upload the device configuration file for
+	 * both RDKV and RDKB devices.
 	 * 
-	 * @param file - the device configuration file
-	 * @return ResponseEntity<String> - the response entity - HttpStatus.OK - if the
+	 * @param file             - the device configuration file
+	 * @param isThunderEnabled - whether thunder is enabled (defaults to false, applicable for RDKV)
+	 * @param category         - the RDK flavor category (RDKV or RDKB)
+	 * @return ResponseEntity<Response> - the response entity - HttpStatus.OK - if the
 	 *         file upload is successful - HttpStatus.BAD_REQUEST - if the file is
 	 *         empty - HttpStatus.INTERNAL_SERVER_ERROR - if the file upload is not
 	 *         successful
@@ -317,9 +323,10 @@ public class DeviceController {
 	@ApiResponse(responseCode = "400", description = "When the file is empty")
 	@PostMapping("/uploadDeviceConfigFile")
 	public ResponseEntity<Response> uploadFile(@RequestParam("uploadFile") MultipartFile file,
-			@RequestParam boolean isThunderEnabled) {
-		LOGGER.info("Received upload device config file request: " + file.getOriginalFilename());
-		boolean isfileUploaded = deviceConfigService.uploadDeviceConfigFile(file, isThunderEnabled);
+			@RequestParam(defaultValue = "false") boolean isThunderEnabled,
+			@RequestParam String category) {
+		LOGGER.info("Received upload device config file request: " + file.getOriginalFilename() + " category: " + category);
+		boolean isfileUploaded = deviceConfigService.uploadDeviceConfigFile(file, isThunderEnabled, category);
 		if (isfileUploaded) {
 			LOGGER.info("File upload is succesful");
 			return ResponseUtils.getCreatedResponse("File uploaded successfully");
@@ -330,10 +337,12 @@ public class DeviceController {
 	}
 
 	/**
-	 * This method is used to delete the device configuration file exclusively for
-	 * RDKV devices and the related usecases
+	 * This method is used to delete the device configuration file for
+	 * both RDKV and RDKB devices.
 	 *
 	 * @param deviceConfigFileName - the device configuration file name
+	 * @param isThunderEnabled     - whether thunder is enabled (defaults to false, applicable for RDKV)
+	 * @param category             - the RDK flavor category (RDKV or RDKB)
 	 * @return ResponseEntity<String> - the response entity - HttpStatus.OK - if the
 	 *         file deletion is successful - HttpStatus.INTERNAL_SERVER_ERROR - if
 	 *         the file deletion is not successful
@@ -345,9 +354,10 @@ public class DeviceController {
 	@ApiResponse(responseCode = "500", description = "Internal server error in deleting device configuration file")
 	@DeleteMapping("/deleteDeviceConfigFile")
 	public ResponseEntity<String> deleteDeviceConfigFile(@RequestParam String deviceConfigFileName,
-			@RequestParam boolean isThunderEnabled) {
-		LOGGER.info("Received delete device config file request: " + deviceConfigFileName);
-		boolean isFileDeleted = deviceConfigService.deleteDeviceConfigFile(deviceConfigFileName, isThunderEnabled);
+			@RequestParam(defaultValue = "false") boolean isThunderEnabled,
+			@RequestParam String category) {
+		LOGGER.info("Received delete device config file request: " + deviceConfigFileName + " category: " + category);
+		boolean isFileDeleted = deviceConfigService.deleteDeviceConfigFile(deviceConfigFileName, isThunderEnabled, category);
 		if (isFileDeleted) {
 			return ResponseEntity.status(HttpStatus.OK).body("File deleted successfully");
 		} else {

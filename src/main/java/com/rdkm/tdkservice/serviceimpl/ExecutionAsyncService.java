@@ -126,6 +126,12 @@ public class ExecutionAsyncService {
 	@Autowired
 	private JenkinsWebHookService jenkinsWebhookService;
 
+	@Autowired
+	private CiRegistryService ciRegistryService;
+
+	@Autowired
+	private CiAppNotificationService ciAppNotificationService;
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(ExecutionService.class);
 
 	/**
@@ -229,6 +235,9 @@ public class ExecutionAsyncService {
 		}
 		// Unlock the device with the current status
 		deviceStatusService.fetchAndUpdateDeviceStatus(device);
+		// Notify the internal CI app that this device is now free so it can process
+		// queued executions
+		ciAppNotificationService.notifyDeviceFree(device, executionName);
 
 	}
 
@@ -250,30 +259,18 @@ public class ExecutionAsyncService {
 		LOGGER.info("CI Jsonobject: {}", request);
 
 		if (callBackUrl == null || callBackUrl.isEmpty()) {
-			callBackUrl = getCallBackUrlFromConfig();
-		}
-
-		if (callBackUrl == null) {
 			LOGGER.warn("No CI callback URL configured, skipping notification for execution: {}",
 					finalExecutionStatus.getId());
 			return; // ← soft fail, execution state is unaffected
 		}
 
+		String secret = ciRegistryService.resolveSecretForCallbackUrl(callBackUrl);
+
 		try {
-			jenkinsWebhookService.sendResultToJenkinsWebhook(request, callBackUrl);
+			jenkinsWebhookService.sendResultToJenkinsWebhook(request, callBackUrl, secret);
 		} catch (Exception e) {
 			LOGGER.error("Error occurred while sending the request to the CI server", e);
 		}
-	}
-
-	/*
-	 * This method is used to get the call back url from the config file
-	 * 
-	 * @return String - the call back url
-	 */
-	private String getCallBackUrlFromConfig() {
-		String configFilePath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR + Constants.TM_CONFIG_FILE;
-		return commonService.getConfigProperty(new File(configFilePath), Constants.CI_CALLBACK_URL);
 	}
 
 	/**
@@ -514,6 +511,9 @@ public class ExecutionAsyncService {
 
 			// Unlock the device with the current status
 			deviceStatusService.fetchAndUpdateDeviceStatus(device);
+			// Notify the internal CI app that this device is now free so it can process
+			// queued executions
+			ciAppNotificationService.notifyDeviceFree(device, executionName);
 		}
 
 	}
@@ -559,11 +559,15 @@ public class ExecutionAsyncService {
 		resultDTO.setBuildFileName(cibuildFileName);
 		resultDTO.setStatus("CI_EXECUTION_COMPLETED");
 		resultDTO.setStatusCode(200);
+		resultDTO.setTimestamp(Instant.now().toString());
+		resultDTO.setExcelReportDownloadUrl(
+				appConfig.getBaseURL() + "/execution/downloadConsolidatedExcelReport?executionName="
+						+ execution.getName());
 
 		ArrayList<DetailedResultDTO> resultDTOList = new ArrayList<>();
 		DetailedResultDTO detailedResultDTO = new DetailedResultDTO();
 		detailedResultDTO.setExecutionName(execution.getName());
-		detailedResultDTO.setExecutionStatus(execution.getExecutionStatus().name());
+		detailedResultDTO.setExecutionStatus(execution.getResult().name());
 		detailedResultDTO.setScriptOrTestSuite(execution.getScripttestSuiteName());
 
 		ArrayList<DeviceDetailsDTO> deviceDTOList = new ArrayList<>();
@@ -1677,11 +1681,15 @@ public class ExecutionAsyncService {
 			e.printStackTrace();
 			// Unlock the device with the current status
 			deviceStatusService.fetchAndUpdateDeviceStatus(device);
-			LOGGER.error("Error in executing scripts: {} on device: {}", device.getName());
+			LOGGER.error("Error in executing scripts on device: {}", device.getName());
 			throw new TDKServiceException("Error in executing scripts: " + " on device: " + device.getName());
+		} finally {
+			// Unlock the device with the current status
+			deviceStatusService.fetchAndUpdateDeviceStatus(device);
+			// Notify the internal CI app that this device is now free so it can process
+			// queued executions
+			ciAppNotificationService.notifyDeviceFree(device, execution.getName());
 		}
-		// Unlock the device with the current status
-		deviceStatusService.fetchAndUpdateDeviceStatus(device);
 	}
 
 	/**

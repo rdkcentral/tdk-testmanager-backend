@@ -25,31 +25,37 @@ import org.springframework.web.multipart.MultipartFile;
 public interface IDeviceConfigService {
 
 	/**
-	 * This method is used to get therdkv device configuration file for a given
+	 * This method is used to get the device configuration file for a given
 	 * device name or device type or default device configuration file.
 	 * 
 	 * @param deviceTypeName - the device type name
 	 * @param deviceType     - the device type
+	 * @param isThunderEnabled - whether thunder is enabled (applicable for RDKV)
+	 * @param category       - the RDK flavor category (RDKV or RDKB)
 	 * @return Resource - the device configuration file
 	 */
-	Resource getDeviceConfigFile(String deviceTypeName, String deviceType, boolean isThunderEnabled);
+	Resource getDeviceConfigFile(String deviceTypeName, String deviceType, boolean isThunderEnabled, String category);
 
 	/**
 	 * This method is used to upload the device configuration file
 	 * 
 	 * @param file - the device configuration file
+	 * @param isThunderEnabled - whether thunder is enabled (applicable for RDKV)
+	 * @param category       - the RDK flavor category (RDKV or RDKB)
 	 * @return boolean - true if the device config file is uploaded successfully
 	 *         false - if the device config file is not uploaded successfully
 	 */
-	boolean uploadDeviceConfigFile(MultipartFile file, boolean isThunderEnabled);
+	boolean uploadDeviceConfigFile(MultipartFile file, boolean isThunderEnabled, String category);
 
 	/**
 	 * This method is used to delete the device configuration file
 	 * 
 	 * @param deviceConfigFileName - the device configuration file name
+	 * @param isThunderEnabled - whether thunder is enabled (applicable for RDKV)
+	 * @param category       - the RDK flavor category (RDKV or RDKB)
 	 * @return boolean - true if the device config file is deleted successfully
 	 *         false - if the device config file is not deleted
 	 */
-	boolean deleteDeviceConfigFile(String deviceConfigFileName, boolean isThunderEnabled);
+	boolean deleteDeviceConfigFile(String deviceConfigFileName, boolean isThunderEnabled, String category);
 
 }
