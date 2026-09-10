@@ -25,6 +25,8 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -36,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.rdkm.tdkservice.dto.OemCreateDTO;
 import com.rdkm.tdkservice.dto.OemDTO;
@@ -80,7 +83,7 @@ public class OemController {
 	@PostMapping("/create")
 	public ResponseEntity<Response> createOem(@RequestBody @Valid OemCreateDTO oemDTO) {
 		LOGGER.info("Received create oemDTO type request: " + oemDTO.toString());
-		boolean isOemCreated = iOemService.createOem(oemDTO);
+		boolean isOemCreated = iOemService.createOem(oemDTO, true);
 		if (isOemCreated) {
 			LOGGER.info("Oem created successfully");
 			return ResponseUtils.getCreatedResponse("Device Type created successfully");
@@ -220,6 +223,39 @@ public class OemController {
 			LOGGER.error("No oem found for the category");
 			return ResponseUtils.getSuccessDataResponse("No oem found for the category", oemListByCategory);
 		}
+	}
+
+	/**
+	 * Downloads all OEMs as an XML file.
+	 *
+	 * @param category the category of the OEMs to download
+	 * @return ResponseEntity containing the XML file
+	 */
+	@Operation(summary = "Download all OEMs as XML", description = "Downloads all OEMs for a category as XML file.")
+	@ApiResponse(responseCode = "200", description = "OEM XML file generated successfully")
+	@GetMapping("/downloadXML")
+	public ResponseEntity<String> downloadAllOemsXML(@RequestParam String category) {
+		LOGGER.info("Received download all OEMs XML request for category: " + category);
+		String xmlContent = iOemService.downloadAllOemsXML(category);
+		HttpHeaders headers = new HttpHeaders();
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=oems.xml");
+		headers.add(HttpHeaders.CONTENT_TYPE, "application/xml");
+		return new ResponseEntity<>(xmlContent, headers, HttpStatus.OK);
+	}
+
+	/**
+	 * Uploads an XML file to create OEMs in bulk.
+	 *
+	 * @param file the XML file containing OEM data
+	 * @return ResponseEntity with the upload result
+	 */
+	@Operation(summary = "Upload OEM XML file", description = "Uploads an XML file to create OEMs in bulk.")
+	@ApiResponse(responseCode = "201", description = "OEMs uploaded successfully")
+	@PostMapping("/uploadxml")
+	public ResponseEntity<Response> uploadOemXML(@RequestParam("file") MultipartFile file) {
+		LOGGER.info("Received upload OEM XML request");
+		iOemService.parseXMLForOem(file);
+		return ResponseUtils.getCreatedResponse("OEMs uploaded successfully");
 	}
 
 }

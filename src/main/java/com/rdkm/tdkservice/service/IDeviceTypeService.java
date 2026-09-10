@@ -22,6 +22,8 @@ package com.rdkm.tdkservice.service;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import com.rdkm.tdkservice.dto.DeviceTypeCreateDTO;
 import com.rdkm.tdkservice.dto.DeviceTypeDTO;
 
@@ -39,7 +41,7 @@ public interface IDeviceTypeService {
 	 * @return boolean This returns true if the deviceType was created successfully,
 	 *         false otherwise.
 	 */
-	boolean createDeviceType(DeviceTypeCreateDTO deviceTypeDTO);
+	boolean createDeviceType(DeviceTypeCreateDTO deviceTypeDTO, boolean exceptionFlag);
 
 	/**
 	 * This method is used to retrieve all deviceTypes.
@@ -88,5 +90,21 @@ public interface IDeviceTypeService {
 	 * @return List<String> This returns a list of DeviceTypes.
 	 */
 	List<String> getDeviceTypeNameByCategory(String category);
+
+	/**
+	 * Downloads all device types by category as XML content.
+	 * 
+	 * @param category The category of the device types to download.
+	 * @return String containing the XML content of all device types.
+	 */
+	String downloadAllDeviceTypesXML(String category);
+
+	/**
+	 * Parses an uploaded XML file and creates device types from it.
+	 * 
+	 * @param file The XML file containing device type definitions.
+	 * @return boolean true if the device types were created successfully.
+	 */
+	boolean parseXMLForDeviceType(MultipartFile file);
 
 }

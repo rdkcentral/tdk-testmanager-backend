@@ -22,6 +22,8 @@ package com.rdkm.tdkservice.service;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import com.rdkm.tdkservice.dto.SocCreateDTO;
 import com.rdkm.tdkservice.dto.SocDTO;
 
@@ -44,7 +46,7 @@ public interface ISocService {
 	 * @return boolean This returns true if the SocVendor was created successfully,
 	 *         false otherwise.
 	 */
-	boolean createSoc(SocCreateDTO socDTO);
+	boolean createSoc(SocCreateDTO socDTO, boolean throwExceptionFlag);
 
 	/**
 	 * This method is used to retrieve all SocVendors.
@@ -97,5 +99,21 @@ public interface ISocService {
 	 * @return List<String> This returns a list of SocVendors.
 	 */
 	List<String> getSOCsListByCategory(String category);
+
+	/**
+	 * Downloads all SOCs by category as XML content.
+	 * 
+	 * @param category The category of the SOCs to download.
+	 * @return String containing the XML content of all SOCs.
+	 */
+	String downloadAllSocsXML(String category);
+
+	/**
+	 * Parses an uploaded XML file and creates SOCs from it.
+	 * 
+	 * @param file The XML file containing SOC definitions.
+	 * @return boolean true if the SOCs were created successfully.
+	 */
+	boolean parseXMLForSoc(MultipartFile file);
 
 }
