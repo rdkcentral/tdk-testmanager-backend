@@ -22,6 +22,8 @@ package com.rdkm.tdkservice.service;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import com.rdkm.tdkservice.dto.OemCreateDTO;
 import com.rdkm.tdkservice.dto.OemDTO;
 
@@ -41,7 +43,7 @@ public interface IOemService {
 	 *         otherwise.
 	 */
 
-	boolean createOem(OemCreateDTO oemDTO);
+	boolean createOem(OemCreateDTO oemDTO, boolean throwExceptionFlag);
 
 	/**
 	 * This method is used to retrieve all oem's.
@@ -94,5 +96,21 @@ public interface IOemService {
 	 * @return List<String> This returns a list of oems.
 	 */
 	List<String> getOemListByCategory(String category);
+
+	/**
+	 * This method is used to download all OEMs as XML.
+	 * 
+	 * @param category This is the category of the OEMs to be downloaded.
+	 * @return String This returns the XML string of all OEMs.
+	 */
+	String downloadAllOemsXML(String category);
+
+	/**
+	 * This method is used to parse an XML file and create OEMs.
+	 * 
+	 * @param file This is the XML file to be parsed.
+	 * @return boolean This returns true if the OEMs were created successfully.
+	 */
+	boolean parseXMLForOem(MultipartFile file);
 
 }
