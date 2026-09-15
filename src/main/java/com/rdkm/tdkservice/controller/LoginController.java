@@ -133,7 +133,6 @@ public class LoginController {
 	public ResponseEntity<DataResponse> signIn(@RequestBody @Valid SigninRequestDTO signinRequest) {
 		LOGGER.info("Entered signIn controller");
 		SigninResponseDTO signinResponseDTO = loginService.signIn(signinRequest);
-		LOGGER.info("Finished signin request, response id: " + signinResponseDTO.toString());
 		ResponseEntity<DataResponse> dataResponse = ResponseUtils.getSuccessDataResponse("Signin is successful",
 				signinResponseDTO);
 		LOGGER.info("Exited signIn controller");
