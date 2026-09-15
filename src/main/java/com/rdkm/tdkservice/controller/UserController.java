@@ -84,7 +84,7 @@ public class UserController {
 	@ApiResponse(responseCode = "409", description = "Conflict")
 	@PostMapping("/create")
 	public ResponseEntity<Response> saveUser(@RequestBody @Valid UserCreateDTO userRequestDTO) {
-		LOGGER.info("Executing saveUser method with request: " + userRequestDTO.toString());
+		LOGGER.info("Entered saveUser controller");
 		boolean isUserCreated = userService.createUser(userRequestDTO);
 		if (isUserCreated) {
 			LOGGER.info("User created successfully");
