@@ -261,7 +261,7 @@ public class UserService implements UserDetailsService {
 	 *                                   exist.
 	 */
 	public UserDTO updateUser(UserUpdateDTO updateUserRequest) {
-		LOGGER.info("Executing updateUser method for the user: " + updateUserRequest.toString());
+		LOGGER.info("Entered updateUser service");
 
 		// Retrieve the user from the database
 		User user = userRepository.findById(updateUserRequest.getUserId()).orElseThrow(

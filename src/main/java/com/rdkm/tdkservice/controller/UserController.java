@@ -125,7 +125,7 @@ public class UserController {
 	@ApiResponse(responseCode = "409", description = "Conflict")
 	@PutMapping("/update")
 	public ResponseEntity<DataResponse> updateUser(@Valid @RequestBody UserUpdateDTO userRequest) {
-		LOGGER.info("Executing updateUser method with request: " + userRequest.toString());
+		LOGGER.info("Entered updateUser controller");
 		UserDTO updatedUser = userService.updateUser(userRequest);
 		if (null != updatedUser) {
 			LOGGER.info("User updated successfully");
