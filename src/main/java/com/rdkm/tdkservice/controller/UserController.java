@@ -206,7 +206,7 @@ public class UserController {
 	@ApiResponse(responseCode = "403", description = "Forbidden")
 	@PostMapping("/changepassword")
 	public ResponseEntity<Response> changePassword(@RequestBody @Valid ChangePasswordRequestDTO changePasswordRequest) {
-		LOGGER.info("The change password request is " + changePasswordRequest.toString());
+		LOGGER.info("Entered changePassword controller");
 		boolean isChangePassword = userService.changePassword(changePasswordRequest);
 		if (isChangePassword) {
 			LOGGER.info("Password change is successful");

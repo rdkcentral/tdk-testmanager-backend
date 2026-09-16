@@ -373,7 +373,7 @@ public class UserService implements UserDetailsService {
 	 * @return boolean - returns true if password is changed successfully
 	 */
 	public boolean changePassword(ChangePasswordRequestDTO changePasswordRequest) {
-		LOGGER.info("The change password request is " + changePasswordRequest.toString());
+		LOGGER.info("Entered changePassword service");
 
 		if (changePasswordRequest.getNewPassword().trim().equals(changePasswordRequest.getOldPassword().trim())) {
 			throw new UserInputException("Old password and New password are same");
