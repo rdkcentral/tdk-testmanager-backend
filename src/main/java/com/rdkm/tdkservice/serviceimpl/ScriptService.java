@@ -385,13 +385,15 @@ public class ScriptService implements IScriptService {
 		String oldScriptLocation = script.getScriptLocation();
 		boolean isLocationChanged = !scriptLocation.equals(oldScriptLocation);
 
-		if (isLocationChanged) {
-			// Location changed — delete old file using old name at old location
-			this.deleteScriptFile(oldName, oldScriptLocation);
+		// Avoid deleting the only copy of the script when no replacement file is provided.
+		// Cleanup is performed only after the new file is validated and saved successfully.
+		if (!scriptFile.isEmpty()) {
+			this.validateScriptFile(scriptFile, script.getName(), scriptLocation);
+			this.saveScriptFile(scriptFile, scriptLocation);
+			if (isLocationChanged || isRenamed) {
+				this.deleteScriptFile(oldName, oldScriptLocation);
+			}
 			script.setScriptLocation(scriptLocation);
-		} else if (isRenamed) {
-			// Same location but name changed — delete old file by old name
-			this.deleteScriptFile(oldName, oldScriptLocation);
 		}
 
 		// Updating the script entity with the updated script details
@@ -411,12 +413,7 @@ public class ScriptService implements IScriptService {
 			LOGGER.info("No test steps to update for the script: " + script.getName());
 		}
 
-		// If the script file is updated, validate and save the new script file
-		if (!scriptFile.isEmpty()) {
-			this.validateScriptFile(scriptFile, script.getName(), script.getScriptLocation());
-			// This will replace the existing file with the new file
-			this.saveScriptFile(scriptFile, script.getScriptLocation());
-		}
+		// Script file save and old-file cleanup are handled earlier to avoid data loss.
 
 		// Set devicetypes in the script entity if the devicetypes are updated
 		if (null != scriptUpdateDTO.getDeviceTypes() || !scriptUpdateDTO.getDeviceTypes().isEmpty()) {
