@@ -387,7 +387,7 @@ public class ScriptService implements IScriptService {
 		// category
 		String newScriptLocation = this.getScriptLocation(module, category);
 		// Determine if name or location has changed
-		boolean isNameChanged = !oldScriptName.equals(scriptUpdateDTO.getName());
+		boolean isNameChanged = !Utils.isEmpty(scriptUpdateDTO.getName()) && !scriptUpdateDTO.getName().equals(oldScriptName);
 		boolean isLocationChanged = !newScriptLocation.equals(oldScriptLocation);
 		// Delete old file if EITHER name or location has changed
 		// Do this BEFORE saving new file to avoid conflicts
