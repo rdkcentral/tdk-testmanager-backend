@@ -381,19 +381,26 @@ public class ScriptService implements IScriptService {
 		} else {
 			LOGGER.info("No test steps to update for the script: " + script.getName());
 		}
-
-		// If the script file is updated, validate and save the new script file
+		// Capture old script location before any changes
+		String oldScriptLocation = script.getScriptLocation();
+		// Compute new script location BEFORE file operations based on module and
+		// category
+		String newScriptLocation = this.getScriptLocation(module, category);
+		// Determine if name or location has changed
+		boolean isNameChanged = !oldScriptName.equals(scriptUpdateDTO.getName());
+		boolean isLocationChanged = !newScriptLocation.equals(oldScriptLocation);
+		// Delete old file if EITHER name or location has changed
+		// Do this BEFORE saving new file to avoid conflicts
+		if (isNameChanged || isLocationChanged) {
+			this.deleteScriptFile(oldScriptName, oldScriptLocation);
+		}
+		// If the script file is updated, validate and save to the NEW location
 		if (!scriptFile.isEmpty()) {
-			this.validateScriptFile(scriptFile, script.getName(), script.getScriptLocation());
-			// This will replave the existing file with the new file
-			this.saveScriptFile(scriptFile, script.getScriptLocation());
+			this.validateScriptFile(scriptFile, script.getName(), newScriptLocation);
+			this.saveScriptFile(scriptFile, newScriptLocation);
 		}
-		// Get script location based on the module and category
-		String scriptLocation = this.getScriptLocation(module, category);
-		if (!oldScriptName.equals(scriptUpdateDTO.getName())) {
-			this.deleteScriptFile(oldScriptName, script.getScriptLocation());
-		}
-		script.setScriptLocation(scriptLocation);
+		// Update script location to the new location
+		script.setScriptLocation(newScriptLocation);
 		// Set devicetypes in the script entity if the devicetypes are updated
 		if (null != scriptUpdateDTO.getDeviceTypes() || !scriptUpdateDTO.getDeviceTypes().isEmpty()) {
 			List<DeviceType> deviceType = this.getScriptDevicetypes(scriptUpdateDTO.getDeviceTypes(),
