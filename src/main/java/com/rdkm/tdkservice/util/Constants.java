@@ -655,4 +655,9 @@ public class Constants {
 	public static final String CI_APP_REGISTRY_CALLBACK_URL_SUFFIX = ".callbackUrl";
 	public static final String CI_APP_REGISTRY_SECRET_SUFFIX = ".secret";
 
+	// Device config key to override the VTS package install base path (Optional)
+	public static final String VTS_BASE_PATH_CONFIG_KEY = "VTS_BASE_PATH";
+	// Device config key to override the TDK package install base path (Optional)
+	public static final String TDK_BASE_PATH_CONFIG_KEY = "TDK_BASE_PATH";
+
 }
