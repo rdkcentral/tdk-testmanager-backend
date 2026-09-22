@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import com.rdkm.tdkservice.response.InstallJobStatusResponse;
 import com.rdkm.tdkservice.response.PackageResponse;
 
 /**
@@ -57,13 +58,24 @@ public interface IPackageManagerService {
 	boolean uploadPackage(String type, MultipartFile uploadFile, String device);
 
 	/**
-	 * Installs a package on the specified device.
-	 *
+	 * Starts installation on a background thread and returns a job id to poll via
+	 * {@link #getInstallPackageJobStatus(String)}.
+	 * 
+	 * @param type        the type of the package to install
 	 * @param device      the device on which to install the package
 	 * @param packageName the name of the package to install
-	 * @return a string indicating the result of the installation
+	 * @return a job id to poll for installation status
 	 */
-	PackageResponse installPackage(String type, String device, String packageName);
+	String startInstallPackageJob(String type, String device, String packageName);
+
+	/**
+	 * Returns the current phase and (once finished) result for a job started via
+	 * {@link #startInstallPackageJob}, or null if unknown.
+	 * 
+	 * @param jobId the id of the installation job to query
+	 * @return the current status of the installation job, or null if unknown
+	 */
+	InstallJobStatusResponse getInstallPackageJobStatus(String jobId);
 
 	/**
 	 * Installs a generic package on the specified device.
@@ -73,5 +85,15 @@ public interface IPackageManagerService {
 	 * @return a string indicating the result of the installation
 	 */
 	boolean uploadGenericPackage(String type, MultipartFile uploadFile, String device);
+
+	/**
+	 * Checks whether a generic package of the given type already exists for the
+	 * device's category.
+	 *
+	 * @param type   the type of the package (TDK/VTS)
+	 * @param device the device used to resolve the category-specific folder
+	 * @return true if a generic package is present, false otherwise
+	 */
+	boolean isGenericPackagePresent(String type, String device);
 
 }

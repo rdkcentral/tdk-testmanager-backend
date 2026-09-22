@@ -24,6 +24,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -34,8 +35,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.rdkm.tdkservice.exception.ResourceNotFoundException;
 import com.rdkm.tdkservice.exception.TDKServiceException;
 import com.rdkm.tdkservice.response.DataResponse;
+import com.rdkm.tdkservice.response.InstallJobStatusResponse;
 import com.rdkm.tdkservice.response.PackageResponse;
 import com.rdkm.tdkservice.response.Response;
 import com.rdkm.tdkservice.service.IPackageManagerService;
@@ -140,34 +143,48 @@ public class PackageManagerController {
 	}
 
 	/**
-	 * This method is used to install the package.
+	 * Starts package installation asynchronously and returns the initial job
+	 * status. Poll GET /installPackage/status with the returned jobId for
+	 * progress (COPYING_PACKAGE, INSTALLING, ...) and the final result.
 	 * 
-	 * @param device      name
-	 * @param packageName
-	 * @return ResponseEntity<String> -success or failure message
+	 * @param type        the type of the package to install
+	 * @param device      the device on which to install the package
+	 * @param packageName the name of the package to install
+	 * @return the initial job status containing the jobId to poll for progress
 	 */
-	@Operation(summary = "Install Package API")
-	@ApiResponse(responseCode = "200", description = "Package Installed Successfully")
+	@Operation(summary = "Install Package API (async)")
+	@ApiResponse(responseCode = "200", description = "Installation started")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "500", description = "Internal Server Error")
 	@PostMapping("/installPackage")
-	public ResponseEntity<DataResponse> installPackage(@RequestParam String type, @RequestParam String device,
-			@RequestParam String packageName) {
+	public ResponseEntity<DataResponse> installPackage(@RequestParam String type,
+			@RequestParam String device, @RequestParam String packageName) {
 		LOGGER.info("installPackage method is called");
-		PackageResponse response = packageManagerService.installPackage(type, device, packageName);
-		if (response != null) {
-			if (response.getStatusCode() == 200) {
-				LOGGER.info("Package installed successfully");
-				return ResponseUtils.getSuccessDataResponse("Package installed successfully", response);
-			} else {
-				LOGGER.error("Package installation failed");
-				// Return 503 Service Unavailable with the error message from response
-				return ResponseUtils.getNotFoundDataConfigResponse("Package installation failed", response);
-			}
-		} else {
-			LOGGER.error("Package installation failed");
-			throw new TDKServiceException("Error while package installation");
+		String jobId = packageManagerService.startInstallPackageJob(type, device, packageName);
+		InstallJobStatusResponse status = packageManagerService.getInstallPackageJobStatus(jobId);
+		return ResponseUtils.getSuccessDataResponse("Installation started", status);
+	}
+
+	/**
+	 * Returns the current phase and (once finished) result for a job started via
+	 * /installPackage. Intended to be polled every 1-2 seconds while status is
+	 * RUNNING.
+	 * 
+	 * @param jobId the id of the installation job to query
+	 * @return the current status of the installation job
+	 */
+	@Operation(summary = "Get Package Installation Status")
+	@ApiResponse(responseCode = "200", description = "Status fetched successfully")
+	@ApiResponse(responseCode = "404", description = "Job not found")
+	@GetMapping("/installPackage/status")
+	public ResponseEntity<DataResponse> getPackageInstallationStatus(@RequestParam String jobId) {
+		LOGGER.info("getPackageInstallationStatus method is called with jobId: {}", jobId);
+		InstallJobStatusResponse status = packageManagerService.getInstallPackageJobStatus(jobId);
+		if (status == null) {
+			// jobId unknown/expired - handled by GlobalExceptionHandler like other 404s
+			throw new ResourceNotFoundException("Install job", jobId);
 		}
+		return ResponseUtils.getSuccessDataResponse(status);
 	}
 
 	/**
@@ -193,5 +210,24 @@ public class PackageManagerController {
 			LOGGER.error("Generic Package upload failed");
 			throw new TDKServiceException("Error while uploading Generic package");
 		}
+	}
+
+	/**
+	 * This method is used to check whether a generic package is already present.
+	 *
+	 * @param type   -TDK,VTS
+	 * @param device -Device name
+	 * @return ResponseEntity<DataResponse> - true if a generic package is present
+	 */
+	@Operation(summary = "Check Generic Package Present API")
+	@ApiResponse(responseCode = "200", description = "Fetched Generic Package presence Successfully")
+	@ApiResponse(responseCode = "400", description = "Bad Request")
+	@ApiResponse(responseCode = "500", description = "Internal Server Error")
+	@GetMapping("/isGenericPackagePresent")
+	public ResponseEntity<DataResponse> isGenericPackagePresent(@RequestParam String type,
+			@RequestParam String device) {
+		LOGGER.info("isGenericPackagePresent method is called");
+		boolean isPresent = packageManagerService.isGenericPackagePresent(type, device);
+		return ResponseUtils.getSuccessDataResponse(isPresent);
 	}
 }
