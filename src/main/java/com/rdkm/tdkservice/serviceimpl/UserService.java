@@ -169,8 +169,13 @@ public class UserService implements UserDetailsService {
 		// User group assignment is skipped during user creation
 		// TODO: User group needs to be removed in the future
 
-		// Setting user status to pending during the registration
-		user.setStatus(Constants.USER_PENDING);
+		// If admin creates user with APPROVED status, set it directly; otherwise default
+		// to PENDING
+		if (Constants.USER_APPROVED.equals(userRequest.getUserStatus())) {
+			user.setStatus(Constants.USER_APPROVED);
+		} else {
+			user.setStatus(Constants.USER_PENDING);
+		}
 
 		User savedUser = userRepository.save(user);
 		if (savedUser != null && savedUser.getId() != null) {
@@ -245,9 +250,27 @@ public class UserService implements UserDetailsService {
 			LOGGER.error("User not found: " + username);
 			return false;
 		}
-		user.setStatus(Constants.USER_ACTIVE);
+		user.setStatus(Constants.USER_APPROVED);
 		userRepository.save(user);
 		LOGGER.info("User activated successfully: " + username);
+		return true;
+	}
+	
+	/**
+	 * This method is used to reject the user
+	 *
+	 * @param username - String
+	 * @return boolean - returns true if user is rejected successfully
+	 */
+	public boolean rejectUser(String username) {
+		LOGGER.info("Rejecting user: " + username);
+		User user = userRepository.findByUsername(username);
+		if (user == null) {
+			LOGGER.error("User not found: " + username);
+			throw new ResourceNotFoundException(Constants.USER_NAME, username);
+		}
+		userRepository.delete(user);
+		LOGGER.info("User rejected and deleted successfully: " + username);
 		return true;
 	}
 

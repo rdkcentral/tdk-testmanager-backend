@@ -305,8 +305,8 @@ public class UserController {
 	@Operation(summary = "Approve User", description = "This API is used to approve a user.")
 	@ApiResponse(responseCode = "200", description = "User approved successfully")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
-	@GetMapping("/approveUser")
-	public ResponseEntity<Response> approveUser(String userName) {
+	@PutMapping("/approveUser")
+	public ResponseEntity<Response> approveUser(@RequestParam String userName) {
 		LOGGER.info("Inside approveUser method");
 		boolean isApproved = userService.activateUser(userName);
 		if (isApproved) {
@@ -315,6 +315,29 @@ public class UserController {
 		} else {
 			LOGGER.error("Error in approving user");
 			throw new TDKServiceException("Error in approving user");
+		}
+	}
+	
+	/**
+	 * This method is used to reject the user
+	 * 
+	 * @param userName - String username of the user to be rejected
+	 * @return ResponseEntity<String> - response entity - message
+	 */
+	@Operation(summary = "Reject User", description = "This API is used to reject a pending user.")
+	@ApiResponse(responseCode = "200", description = "User rejected successfully")
+	@ApiResponse(responseCode = "400", description = "Bad Request")
+	@ApiResponse(responseCode = "404", description = "User not found")
+	@PutMapping("/rejectUser")
+	public ResponseEntity<Response> rejectUser(@RequestParam String userName) {
+		LOGGER.info("Inside rejectUser method");
+		boolean isRejected = userService.rejectUser(userName);
+		if (isRejected) {
+			LOGGER.info("User rejected successfully");
+			return ResponseUtils.getSuccessResponse("User rejected successfully");
+		} else {
+			LOGGER.error("Error in rejecting user");
+			throw new TDKServiceException("Error in rejecting user");
 		}
 	}
 
