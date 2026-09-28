@@ -116,13 +116,14 @@ public class LoginService implements ILoginService {
 
 		User user = userRepository.findByUsername(signinRequest.getUsername());
 
-		// TODO: Once the user status is implemented from the front end , uncomment this
-		// So only the approved users can login
-		// if (user.getStatus() == Constants.USER_PENDING) {
-		// LOGGER.error("User account is pending: " + user.getUsername());
-		// throw new UserInputException("User account is pending: " + user.getUsername()
-		// + " .Please contact your administrator to approve the request");
-		// }
+		// Block login for users who are not yet approved by admin
+		if (!Constants.USER_APPROVED.equals(user.getStatus())) {
+			if (Constants.USER_PENDING.equals(user.getStatus())) {
+				LOGGER.error("User account is pending approval: " + user.getUsername());
+				throw new UserInputException(
+						"Your account is pending admin approval. Please contact your administrator.");
+			}
+		}
 
 		String jwt = jwtUtils.generateToken(user);
 		signinResponse.setToken(jwt);
