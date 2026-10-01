@@ -41,9 +41,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.rdkm.tdkservice.config.AppConfig;
 import com.rdkm.tdkservice.exception.UserInputException;
-import com.rdkm.tdkservice.model.Device;
 import com.rdkm.tdkservice.service.IDeviceConfigService;
-import com.rdkm.tdkservice.service.utilservices.CommonService;
 import com.rdkm.tdkservice.util.Constants;
 import com.rdkm.tdkservice.util.Utils;
 
@@ -57,9 +55,6 @@ import com.rdkm.tdkservice.util.Utils;
 public class DeviceConfigService implements IDeviceConfigService {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(DeviceConfigService.class);
-
-	@Autowired
-	private CommonService commonService;
 
 	/**
 	 * This method is used to get the device configuration file for a given device
@@ -321,51 +316,6 @@ public class DeviceConfigService implements IDeviceConfigService {
 		} else {
 			throw new UserInputException("Unsupported category: " + category + ". Expected RDKV or RDKB.");
 		}
-	}
-
-	/**
-	 * Reads an optional override property (e.g. VTS_BASE_PATH/TDK_BASE_PATH) for a
-	 * device. The device's own config file (named after the device) is checked
-	 * first; if that file is absent or does not have a value for the key, the
-	 * device type config file is checked as a fallback.
-	 * 
-	 * @param device - the device for which the override is being resolved
-	 * @param key    - the config key to look up
-	 * @return the trimmed, non-empty value if configured, otherwise null
-	 */
-	public String getDeviceConfigPropertyOverride(Device device, String key) {
-		String category = device.getCategory() != null ? device.getCategory().getName() : null;
-		String configDir = resolveConfigDir(device.isThunderEnabled(), category);
-		String configDirPath = AppConfig.getBaselocation() + Constants.FILE_PATH_SEPERATOR + configDir
-				+ Constants.FILE_PATH_SEPERATOR;
-
-		String value = readPropertyIfPresent(configDirPath, device.getName(), key);
-		if (Utils.isEmpty(value) && device.getDeviceType() != null) {
-			value = readPropertyIfPresent(configDirPath, device.getDeviceType().getName(), key);
-		}
-		return value;
-	}
-
-	/**
-	 * Reads the given key from
-	 * &lt;configDirPath&gt;/&lt;configFileBaseName&gt;.config
-	 * if that file exists.
-	 * 
-	 * @param configDirPath      - the config directory path
-	 * @param configFileBaseName - the config file name without extension
-	 * @param key                - the config key to look up
-	 * @return the trimmed, non-empty value if present, otherwise null
-	 */
-	private String readPropertyIfPresent(String configDirPath, String configFileBaseName, String key) {
-		if (Utils.isEmpty(configFileBaseName)) {
-			return null;
-		}
-		File configFile = new File(configDirPath + configFileBaseName + Constants.CONFIG_FILE_EXTENSION);
-		if (!configFile.exists()) {
-			return null;
-		}
-		String value = commonService.getConfigProperty(configFile, key);
-		return Utils.isEmpty(value) ? null : value.trim();
 	}
 
 }

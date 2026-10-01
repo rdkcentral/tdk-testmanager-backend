@@ -145,11 +145,13 @@ public class PackageManagerController {
 	/**
 	 * Starts package installation asynchronously and returns the initial job
 	 * status. Poll GET /installPackage/status with the returned jobId for
-	 * progress (COPYING_PACKAGE, INSTALLING, ...) and the final result.
+	 * progress (COPYING_PACKAGE_AND_SCRIPT, INSTALLING, ...) and the final result.
 	 * 
-	 * @param type        the type of the package to install
-	 * @param device      the device on which to install the package
-	 * @param packageName the name of the package to install
+	 * @param type             the type of the package to install
+	 * @param device           the device on which to install the package
+	 * @param packageName      the name of the package to install
+	 * @param installDirectory optional on-device directory to install into; base
+	 *                         directory is used when not provided
 	 * @return the initial job status containing the jobId to poll for progress
 	 */
 	@Operation(summary = "Install Package API (async)")
@@ -158,9 +160,10 @@ public class PackageManagerController {
 	@ApiResponse(responseCode = "500", description = "Internal Server Error")
 	@PostMapping("/installPackage")
 	public ResponseEntity<DataResponse> installPackage(@RequestParam String type,
-			@RequestParam String device, @RequestParam String packageName) {
+			@RequestParam String device, @RequestParam String packageName,
+			@RequestParam(required = false) String installDirectory) {
 		LOGGER.info("installPackage method is called");
-		String jobId = packageManagerService.startInstallPackageJob(type, device, packageName);
+		String jobId = packageManagerService.startInstallPackageJob(type, device, packageName, installDirectory);
 		InstallJobStatusResponse status = packageManagerService.getInstallPackageJobStatus(jobId);
 		return ResponseUtils.getSuccessDataResponse("Installation started", status);
 	}

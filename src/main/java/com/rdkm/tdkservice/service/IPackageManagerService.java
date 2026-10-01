@@ -61,12 +61,14 @@ public interface IPackageManagerService {
 	 * Starts installation on a background thread and returns a job id to poll via
 	 * {@link #getInstallPackageJobStatus(String)}.
 	 * 
-	 * @param type        the type of the package to install
-	 * @param device      the device on which to install the package
-	 * @param packageName the name of the package to install
+	 * @param type             the type of the package to install
+	 * @param device           the device on which to install the package
+	 * @param packageName      the name of the package to install
+	 * @param installDirectory optional on-device directory to install into; base
+	 *                         directory is used when not provided
 	 * @return a job id to poll for installation status
 	 */
-	String startInstallPackageJob(String type, String device, String packageName);
+	String startInstallPackageJob(String type, String device, String packageName, String installDirectory);
 
 	/**
 	 * Returns the current phase and (once finished) result for a job started via

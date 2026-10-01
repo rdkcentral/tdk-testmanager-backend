@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -69,9 +70,6 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 	@Autowired
 	private ScriptExecutorService scriptExecutorService;
 
-	@Autowired
-	private DeviceConfigService deviceConfigService;
-
 	private final ExecutorService installJobExecutor = Executors.newCachedThreadPool();
 	private final Map<String, InstallJob> installJobs = new ConcurrentHashMap<>();
 	private static final long INSTALL_JOB_RETENTION_MINUTES = 30;
@@ -98,13 +96,6 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		boolean isPackageCreation = true;
 		Device deviceObj = validateDeviceAndSoc(device);
 
-		// VTS (video specific) package creation is not applicable for Broadband devices
-		if (Category.RDKB.equals(deviceObj.getCategory()) && Constants.VTS.equalsIgnoreCase(type)) {
-			LOGGER.error("VTS package creation is not supported for Broadband devices");
-			createPackageResponse.setStatusCode(HttpStatus.NOT_IMPLEMENTED.value());
-			createPackageResponse.setLogs("Create Package is not supported for Broadband devices");
-			return createPackageResponse;
-		}
 		// Determine script and package folder based on type
 		String scriptName = getScriptFile(type, false, isPackageCreation, deviceObj.getCategory());
 		String packageFolder = getPackageFolder(type, deviceObj.getCategory());
@@ -249,26 +240,17 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 	 * @throws UserInputException if the device is not found or is offline
 	 * @throws RuntimeException   if there is an error executing the script
 	 */
-	public PackageResponse installPackage(String type, String device, String packageName,
+	public PackageResponse installPackage(String type, String device, String packageName, String installDirectory,
 			Consumer<String> phaseListener) {
 		LOGGER.info("Installing package {} of type {} on device {}", packageName, type, device);
 		boolean isPackageInstallation = true;
 		Device deviceObj = validateDeviceAndSoc(device);
 		validatePackageTypeSupported(type, deviceObj);
-		// so an install already in progress must be detected from the persisted status
-		// instead
-		if (DeviceStatus.IN_USE.equals(deviceObj.getDeviceStatus())) {
-			LOGGER.error("Device {} is already in use by another operation", device);
-			throw new UserInputException("Device " + device + " is currently in use by another operation");
-		}
 
 		DeviceStatus deviceStatus = deviceStatusService.fetchDeviceStatus(deviceObj);
-		if (deviceStatus == DeviceStatus.FREE) {
-			deviceStatusService.setDeviceStatus(DeviceStatus.IN_USE, deviceObj.getName());
-		} else if (deviceStatus == DeviceStatus.NOT_FOUND) {
+		if (deviceStatus == DeviceStatus.NOT_FOUND) {
 			LOGGER.warn("Device {} reported as offline; proceeding with install attempt anyway", device);
-			deviceStatusService.setDeviceStatus(DeviceStatus.IN_USE, deviceObj.getName());
-		} else {
+		} else if (deviceStatus != DeviceStatus.FREE) {
 			LOGGER.error("Device is not available");
 			throw new UserInputException("Device " + device + " is not available for update");
 		}
@@ -304,19 +286,18 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		String password = ""; // Your password here
 		String user = "root";
 		String userPassword = "root";
-		// Device-specific install directory (falls back to "/" if not configured)
-		String installBasePath = resolveInstallBasePath(deviceObj, type);
+		// Requested install directory (falls back to "/" when not provided)
+		String installBasePath = resolveInstallBasePath(installDirectory);
 		LOGGER.info("Resolved install base path {} for device {} and type {}", installBasePath, device, type);
-		String vtsPackageCommand = "test -f " + installBasePath + "vts_installed && echo VTS_INSTALLED";
-
-		String tdkPackageCommand = "(systemctl status tdk | grep 'Active: active (running)') || (test -f /opt/TDK/.no_tdk_agent && echo '.no_tdk_agent file found')";
-		String npvsCommand = "command -v tdk_mediapipelinetests";
 		String[] copyPackageCommand = { sshPass, "-p", password, "scp", scpOption,
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				tdkPackagesLocation, user + "@" + deviceIp + ":" + installBasePath };
 		String[] copyScriptCommand = { sshPass, "-p", password, "scp", scpOption,
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				scriptPath, user + "@" + deviceIp + ":" + installBasePath };
+		String[] createInstallDirectoryCommand = { sshPass, "-p", userPassword, "ssh",
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				user + "@" + deviceIp, "mkdir -p " + installBasePath };
 		String[] executeScriptCommand = { sshPass, "-p", userPassword, "ssh",
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				user + "@" + deviceIp,
@@ -327,28 +308,17 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				user + "@" + deviceIp, "/bin/cat " + remoteFilePath };
 
-		String[] vtsPackageVerificationCommand = { sshPass, "-p", password, "ssh",
-				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-				user + "@" + deviceIp, vtsPackageCommand };
-		String[] tdkPackageVerificationCommand = { sshPass, "-p", password, "ssh",
-				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-				user + "@" + deviceIp, tdkPackageCommand };
-		String[] npvsVerificationCommand = { sshPass, "-p", password, "ssh",
-				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-				user + "@" + deviceIp, npvsCommand };
 		LOGGER.info("copyPackageCommand: " + Arrays.toString(copyPackageCommand));
 		LOGGER.info("copyScriptCommand: " + Arrays.toString(copyScriptCommand));
+		LOGGER.info("createInstallDirectoryCommand: " + Arrays.toString(createInstallDirectoryCommand));
 		LOGGER.info("executeScriptCommand: " + Arrays.toString(executeScriptCommand));
 		LOGGER.info("logsCommand: " + Arrays.toString(logsCommand));
-		LOGGER.info("vtsPackageVerificationCommand: " + Arrays.toString(vtsPackageVerificationCommand));
-		LOGGER.info("tdkPackageVerificationCommand: " + Arrays.toString(tdkPackageVerificationCommand));
 		try {
 
-			// Execute the commands to copy the package file to the device root folder
-			reportPhase(phaseListener, "COPYING_PACKAGE");
+			// Copy the package file and the install script to the device root folder
+			reportPhase(phaseListener, "COPYING_PACKAGE_AND_SCRIPT");
+			scriptExecutorService.executeScript(createInstallDirectoryCommand, 60);
 			scriptExecutorService.executeScript(copyPackageCommand, 300);
-			// Execute the commands to copy the shell script file to the device root folder
-			reportPhase(phaseListener, "COPYING_SCRIPT");
 			scriptExecutorService.executeScript(copyScriptCommand, 300);
 			// Execute the shellscript in device and writes the logs to the directory
 			// /opt/TDK/logs/tdk_agent.log
@@ -356,74 +326,22 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 			scriptExecutorService.executeScript(executeScriptCommand, 120);
 			reportPhase(phaseListener, "VERIFYING");
 			PackageResponse installPackageResponse = new PackageResponse();
-			if ("TDK".equalsIgnoreCase(type)) {
-				if (packageName.contains("npvs") || packageName.contains("NPVS")) {
-					// If package is npvs then we need to verify npvs installation
-					String output = scriptExecutorService.executeScript(logsCommand, 90);
-					String npvsVerification = scriptExecutorService.executeScript(npvsVerificationCommand, 60);
-					if (npvsVerification != null && !npvsVerification.isEmpty()) {
-						String message = "\nTDK Package installed successfully.";
-						output = output + message;
-						installPackageResponse.setStatusCode(HttpStatus.OK.value());
-						installPackageResponse.setLogs(output);
-					} else {
-						String errorMessage = "\n Error Occured While Installation";
-						output = output + errorMessage;
-						installPackageResponse.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE.value());
-						installPackageResponse.setLogs(output);
-					}
-
-				} else if (packageName.contains("tdk") || packageName.contains("TDK")) {
-					// Checks whether tdk agent status is Active
-					String output = scriptExecutorService.executeScript(logsCommand, 90);
-					String tdkVerification = scriptExecutorService.executeScript(tdkPackageVerificationCommand, 60);
-					if (tdkVerification != null && !tdkVerification.isEmpty()) {
-						LOGGER.info("TDK Package installed successfully" + tdkVerification);
-						String message = "\nTDK Package installed successfully.";
-						LOGGER.info("Message: " + output + message);
-						output = output + message;
-						installPackageResponse = new PackageResponse();
-						installPackageResponse.setStatusCode(HttpStatus.OK.value());
-						installPackageResponse.setLogs(output);
-
-					} else {
-						String errorMessage = "\n Error Occured While Installation";
-						output = output + errorMessage;
-						installPackageResponse = new PackageResponse();
-						installPackageResponse.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE.value());
-						installPackageResponse.setLogs(output);
-					}
-
-				}
-
-			} else if ("VTS".equalsIgnoreCase(type)) {
-				// After a successful VTS install, InstallVTSPackage.sh creates a vts_installed
-				// marker file
-				String output = scriptExecutorService.executeScript(logsCommand, 90);
-				String vtsVerification = scriptExecutorService.executeScript(vtsPackageVerificationCommand, 30);
-				if (vtsVerification != null && !vtsVerification.isEmpty()) {
-					String message = "\nVTS Package installed successfully.";
-					output = output + message;
-					installPackageResponse = new PackageResponse();
-					installPackageResponse.setStatusCode(HttpStatus.OK.value());
-					installPackageResponse.setLogs(output);
-				} else {
-					String errorMessage = "\n Error Occured While Installation";
-					output = output + errorMessage;
-					installPackageResponse = new PackageResponse();
-					installPackageResponse.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE.value());
-					installPackageResponse.setLogs(output);
-				}
-
-			}
+			String output = scriptExecutorService.executeScript(logsCommand, 90);
+			String expectedSuccessMessage = "TDK".equalsIgnoreCase(type)
+					? "TDK Package installed successfully"
+					: "VTS Package installed successfully";
+			boolean installationSucceeded = output != null
+					&& output.toLowerCase(Locale.ROOT).contains(expectedSuccessMessage.toLowerCase(Locale.ROOT));
+			installPackageResponse.setStatusCode(installationSucceeded ? HttpStatus.OK.value()
+					: HttpStatus.SERVICE_UNAVAILABLE.value());
+			installPackageResponse.setLogs(output != null ? output
+					: "Installation log could not be retrieved");
 			return installPackageResponse;
 
 		} catch (Exception e) {
 			LOGGER.error("Error executing script", e);
 			return null;
 
-		} finally {
-			deviceStatusService.fetchAndUpdateDeviceStatus(deviceObj);
 		}
 
 	}
@@ -452,10 +370,17 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 	 * @return the job ID for tracking the installation progress
 	 */
 	@Override
-	public String startInstallPackageJob(String type, String device, String packageName) {
+	public String startInstallPackageJob(String type, String device, String packageName, String installDirectory) {
+		Device deviceObj = validateDeviceAndSoc(device);
+		validatePackageTypeSupported(type, deviceObj);
+		int claimed = deviceRepository.claimDeviceForInstall(device, DeviceStatus.IN_USE);
+		if (claimed == 0) {
+			LOGGER.error("Device {} is already in use by another operation", device);
+			throw new UserInputException("Device " + device + " is currently in use by another operation");
+		}
 		String jobId = UUID.randomUUID().toString();
 		installJobs.put(jobId, new InstallJob());
-		installJobExecutor.submit(() -> runInstallJob(jobId, type, device, packageName));
+		installJobExecutor.submit(() -> runInstallJob(jobId, type, device, packageName, installDirectory));
 		return jobId;
 	}
 
@@ -495,14 +420,15 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 	 * @param device      the target device for the installation
 	 * @param packageName the name of the package to install
 	 */
-	private void runInstallJob(String jobId, String type, String device, String packageName) {
+	private void runInstallJob(String jobId, String type, String device, String packageName, String installDirectory) {
 		InstallJob job = installJobs.get(jobId);
 		if (job == null) {
 			LOGGER.warn("Attempted to process missing install job {}", jobId);
 			return;
 		}
 		try {
-			PackageResponse response = installPackage(type, device, packageName, phase -> job.phase = phase);
+			PackageResponse response = installPackage(type, device, packageName, installDirectory,
+					phase -> job.phase = phase);
 			Integer resultCode = response != null ? response.getStatusCode() : null;
 			String resultLogs = response != null ? response.getLogs() : null;
 			job.statusCode = resultCode;
@@ -515,6 +441,10 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 			job.logs = JOB_ERROR_MESSAGE;
 			job.status = JOB_STATUS_FAILED;
 		} finally {
+			Device claimedDevice = deviceRepository.findByName(device);
+			if (claimedDevice != null) {
+				deviceStatusService.fetchAndUpdateDeviceStatus(claimedDevice);
+			}
 			job.finishedAtMillis = System.currentTimeMillis();
 		}
 	}
@@ -717,24 +647,18 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 
 	/**
 	 * Resolves the on-device directory the package and install script should be
-	 * copied to and executed from. Reads the VTS_BASE_PATH/TDK_BASE_PATH override
-	 * from the device's config file (falling back to the device type's config
-	 * file), and uses it directly as the install directory. Falls back to "/"
-	 * when no override is configured.
+	 * copied to and executed from, using the caller-supplied directory. Falls back
+	 * to "/" when no directory is provided.
 	 *
-	 * @param device the device the package is being installed on
-	 * @param type   the type of the package (TDK/VTS)
+	 * @param installDirectory the requested on-device install directory, may be null
 	 * @return the base directory (with trailing "/") to install into
 	 */
-	private String resolveInstallBasePath(Device device, String type) {
-		String key = Constants.VTS.equalsIgnoreCase(type) ? Constants.VTS_BASE_PATH_CONFIG_KEY
-				: Constants.TDK_BASE_PATH_CONFIG_KEY;
-		String override = deviceConfigService.getDeviceConfigPropertyOverride(device, key);
-		if (Utils.isEmpty(override)) {
+	private String resolveInstallBasePath(String installDirectory) {
+		if (Utils.isEmpty(installDirectory)) {
 			return Constants.FILE_PATH_SEPERATOR;
 		}
-		// Use the configured directory as-is, just ensure a single trailing slash
-		String normalized = override.trim().replaceAll("/+$", "");
+		// Use the provided directory as-is, just ensure a single trailing slash
+		String normalized = installDirectory.trim().replaceAll("/+$", "");
 		return Utils.isEmpty(normalized) ? Constants.FILE_PATH_SEPERATOR : normalized + Constants.FILE_PATH_SEPERATOR;
 	}
 
