@@ -29,6 +29,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -46,6 +47,7 @@ import com.rdkm.tdkservice.serviceimpl.UserService;
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
 	@Autowired
@@ -77,14 +79,12 @@ public class SecurityConfig {
 							// proper REST API paths
 							.requestMatchers("/api/v1/auth/**", "/actuator/**", "/fileStore/**", "/execution/**",
 									"/deviceGroup/**", "/primitiveTest/**", "/api/v1/app-upgrade/**",
-									"/api/v1/script/**", "/api/v1/users/**", "/api/v1/version/**")
+									"/api/v1/script/**", "/api/v1/users/create", "/api/v1/version/**")
 							.permitAll()
-							// Authorization based access control framework is added.
-							// Currently, the authorization based on roles is handled in the frontend.
-							// In the future, backend role-based access can be enabled by uncommenting the
-							// line below
-							// and adding the APIs to be accessed by admin or other roles as needed.
-							// .requestMatchers("/api/v1/users/**").hasAuthority("admin")
+							.requestMatchers("/api/v1/users/admin/create", "/api/v1/users/approveUser",
+									"/api/v1/users/rejectUser")
+							.hasAuthority("admin")
+							.requestMatchers("/api/v1/users/**").authenticated()
 							.requestMatchers(SWAGGER_UI).permitAll().anyRequest().authenticated())
 					.sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 					.authenticationProvider(authenticationProvider())

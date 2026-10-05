@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,7 +38,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.rdkm.tdkservice.dto.UserUpdateDTO;
-
+import com.rdkm.tdkservice.util.Constants;
 import com.rdkm.tdkservice.dto.ChangePasswordRequestDTO;
 import com.rdkm.tdkservice.dto.UserCreateDTO;
 import com.rdkm.tdkservice.dto.UserDTO;
@@ -85,12 +86,30 @@ public class UserController {
 	@PostMapping("/create")
 	public ResponseEntity<Response> saveUser(@RequestBody @Valid UserCreateDTO userRequestDTO) {
 		LOGGER.info("Executing saveUser method with request: " + userRequestDTO.toString());
+		userRequestDTO.setUserStatus(Constants.USER_PENDING);
 		boolean isUserCreated = userService.createUser(userRequestDTO);
 		if (isUserCreated) {
 			LOGGER.info("User created successfully");
 			return ResponseUtils.getCreatedResponse("User created succesfully");
 		} else {
 			LOGGER.error("Error in saving user data");
+			throw new TDKServiceException("User creation failed");
+		}
+	}
+
+	@Operation(summary = "Admin API to create an approved user", description = "This API is used by an authenticated admin to create a pre-approved user")
+	@ApiResponse(responseCode = "201", description = "Successfully created approved user")
+	@PreAuthorize("hasAuthority('admin')")
+	@PostMapping("/admin/create")
+	public ResponseEntity<Response> createApprovedUser(@RequestBody @Valid UserCreateDTO userRequestDTO) {
+		LOGGER.info("Executing admin create user flow with request: " + userRequestDTO.toString());
+		userRequestDTO.setUserStatus(Constants.USER_APPROVED);
+		boolean isUserCreated = userService.createApprovedUser(userRequestDTO);
+		if (isUserCreated) {
+			LOGGER.info("Approved user created successfully");
+			return ResponseUtils.getCreatedResponse("User created succesfully");
+		} else {
+			LOGGER.error("Error in saving approved user data");
 			throw new TDKServiceException("User creation failed");
 		}
 	}
@@ -305,6 +324,7 @@ public class UserController {
 	@Operation(summary = "Approve User", description = "This API is used to approve a user.")
 	@ApiResponse(responseCode = "200", description = "User approved successfully")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
+	@PreAuthorize("hasAuthority('admin')")
 	@PutMapping("/approveUser")
 	public ResponseEntity<Response> approveUser(@RequestParam String userName) {
 		LOGGER.info("Inside approveUser method");
@@ -328,6 +348,7 @@ public class UserController {
 	@ApiResponse(responseCode = "200", description = "User rejected successfully")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "404", description = "User not found")
+	@PreAuthorize("hasAuthority('admin')")
 	@PutMapping("/rejectUser")
 	public ResponseEntity<Response> rejectUser(@RequestParam String userName) {
 		LOGGER.info("Inside rejectUser method");

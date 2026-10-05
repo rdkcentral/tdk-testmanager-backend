@@ -118,12 +118,9 @@ public class LoginService implements ILoginService {
 
 		// Block login for users who are not yet approved by admin
 		if (!Constants.USER_APPROVED.equals(user.getStatus())) {
-			if (Constants.USER_PENDING.equals(user.getStatus())) {
-				LOGGER.error("User account is pending approval: " + user.getUsername());
-				throw new UserInputException(
-						"Your account is pending admin approval. Please contact your administrator.");
-			}
-		}
+ 			LOGGER.error("User account is not approved: " + user.getUsername());
+ 			throw new UserInputException("Your account is not approved. Please contact your administrator.");
+ 		}
 
 		String jwt = jwtUtils.generateToken(user);
 		signinResponse.setToken(jwt);

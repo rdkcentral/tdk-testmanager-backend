@@ -115,6 +115,14 @@ public class UserService implements UserDetailsService {
 	 * @return the saved User object
 	 */
 	public boolean createUser(UserCreateDTO userRequest) {
+		return createUserInternal(userRequest, false);
+	}
+
+	public boolean createApprovedUser(UserCreateDTO userRequest) {
+		return createUserInternal(userRequest, true);
+	}
+
+	private boolean createUserInternal(UserCreateDTO userRequest, boolean approvedByAdmin) {
 		LOGGER.info("Going to create a new user");
 		// Check if the user already exists with the same username
 		if (userRepository.existsByUsername(userRequest.getUserName())) {
@@ -166,16 +174,9 @@ public class UserService implements UserDetailsService {
 		}
 		user.setTheme(theme);
 
-		// User group assignment is skipped during user creation
-		// TODO: User group needs to be removed in the future
-
-		// If admin creates user with APPROVED status, set it directly; otherwise default
-		// to PENDING
-		if (Constants.USER_APPROVED.equals(userRequest.getUserStatus())) {
-			user.setStatus(Constants.USER_APPROVED);
-		} else {
-			user.setStatus(Constants.USER_PENDING);
-		}
+		// Public/self-service registration never trusts the client-supplied status.
+		// Admin-only approved creation must use a dedicated authorized path.
+		user.setStatus(approvedByAdmin ? Constants.USER_APPROVED : Constants.USER_PENDING);
 
 		User savedUser = userRepository.save(user);
 		if (savedUser != null && savedUser.getId() != null) {
