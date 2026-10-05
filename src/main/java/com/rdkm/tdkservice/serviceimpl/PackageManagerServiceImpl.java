@@ -77,6 +77,8 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 	private static final String JOB_STATUS_SUCCESS = "SUCCESS";
 	private static final String JOB_STATUS_FAILED = "FAILED";
 	private static final String JOB_ERROR_MESSAGE = "Installation failed. Please retry or contact support.";
+	// Printed by a remote step only when it exits successfully.
+	private static final String CMD_OK_MARKER = "__TDK_CMD_OK__";
 
 	/**
 	 * Creates a package for the specified device.
@@ -240,8 +242,8 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 	 * @throws UserInputException if the device is not found or is offline
 	 * @throws RuntimeException   if there is an error executing the script
 	 */
-	public PackageResponse installPackage(String type, String device, String packageName, String installDirectory,
-			Consumer<String> phaseListener) {
+	public PackageResponse installPackage(String jobId, String type, String device, String packageName,
+			String installDirectory, Consumer<String> phaseListener) {
 		LOGGER.info("Installing package {} of type {} on device {}", packageName, type, device);
 		boolean isPackageInstallation = true;
 		Device deviceObj = validateDeviceAndSoc(device);
@@ -278,7 +280,8 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 			throw new ResourceNotFoundException("Package ", packageName);
 		}
 
-		String remoteFilePath = "/opt/TDK/logs/tdk_agent.log";
+		// Per-job log so a previous job's log can never be read as this job's result.
+		String remoteFilePath = "/opt/TDK/logs/tdk_agent_" + jobId + ".log";
 		String deviceIp = deviceObj.getIp();
 		String scpOption = "-O";
 		// sshpass command to bypass password that entered manually
@@ -297,7 +300,14 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 				scriptPath, user + "@" + deviceIp + ":" + installBasePath };
 		String[] createInstallDirectoryCommand = { sshPass, "-p", userPassword, "ssh",
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-				user + "@" + deviceIp, "mkdir -p " + installBasePath };
+				user + "@" + deviceIp, "mkdir -p " + installBasePath + " && echo " + CMD_OK_MARKER };
+		// scp carries no remote command to echo a marker, so confirm each file landed.
+		String[] verifyPackageCommand = { sshPass, "-p", userPassword, "ssh",
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				user + "@" + deviceIp, "test -f " + installBasePath + packageName + " && echo " + CMD_OK_MARKER };
+		String[] verifyScriptCommand = { sshPass, "-p", userPassword, "ssh",
+				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+				user + "@" + deviceIp, "test -f " + installBasePath + scriptName + " && echo " + CMD_OK_MARKER };
 		String[] executeScriptCommand = { sshPass, "-p", userPassword, "ssh",
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				user + "@" + deviceIp,
@@ -311,17 +321,27 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		LOGGER.info("copyPackageCommand: " + Arrays.toString(copyPackageCommand));
 		LOGGER.info("copyScriptCommand: " + Arrays.toString(copyScriptCommand));
 		LOGGER.info("createInstallDirectoryCommand: " + Arrays.toString(createInstallDirectoryCommand));
+		LOGGER.info("verifyPackageCommand: " + Arrays.toString(verifyPackageCommand));
+		LOGGER.info("verifyScriptCommand: " + Arrays.toString(verifyScriptCommand));
 		LOGGER.info("executeScriptCommand: " + Arrays.toString(executeScriptCommand));
 		LOGGER.info("logsCommand: " + Arrays.toString(logsCommand));
 		try {
 
 			// Copy the package file and the install script to the device root folder
 			reportPhase(phaseListener, "COPYING_PACKAGE_AND_SCRIPT");
-			scriptExecutorService.executeScript(createInstallDirectoryCommand, 60);
+			if (!remoteStepSucceeded(createInstallDirectoryCommand, 60)) {
+				return failedInstallResponse(
+						"Failed to create install directory " + installBasePath + " on device " + device);
+			}
 			scriptExecutorService.executeScript(copyPackageCommand, 300);
+			if (!remoteStepSucceeded(verifyPackageCommand, 60)) {
+				return failedInstallResponse("Failed to copy package " + packageName + " to device " + device);
+			}
 			scriptExecutorService.executeScript(copyScriptCommand, 300);
-			// Execute the shellscript in device and writes the logs to the directory
-			// /opt/TDK/logs/tdk_agent.log
+			if (!remoteStepSucceeded(verifyScriptCommand, 60)) {
+				return failedInstallResponse("Failed to copy install script to device " + device);
+			}
+			// Execute the shellscript in device and writes the logs to the per-job log file
 			reportPhase(phaseListener, "INSTALLING");
 			scriptExecutorService.executeScript(executeScriptCommand, 120);
 			reportPhase(phaseListener, "VERIFYING");
@@ -359,6 +379,33 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		if (phaseListener != null) {
 			phaseListener.accept(phase);
 		}
+	}
+
+	/**
+	 * Runs a remote command and treats it as successful only when its stdout
+	 * carries the success sentinel, so a non-zero ssh/scp step is not ignored.
+	 *
+	 * @param command        the remote command to run
+	 * @param timeoutSeconds  the execution timeout in seconds
+	 * @return true if the command emitted the success marker, false otherwise
+	 */
+	private boolean remoteStepSucceeded(String[] command, int timeoutSeconds) {
+		String output = scriptExecutorService.executeScript(command, timeoutSeconds);
+		return output != null && output.contains(CMD_OK_MARKER);
+	}
+
+	/**
+	 * Builds a failed install response carrying the given reason.
+	 *
+	 * @param message the failure reason to log and return
+	 * @return a PackageResponse with SERVICE_UNAVAILABLE and the reason as logs
+	 */
+	private PackageResponse failedInstallResponse(String message) {
+		LOGGER.error(message);
+		PackageResponse response = new PackageResponse();
+		response.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE.value());
+		response.setLogs(message);
+		return response;
 	}
 
 	/**
@@ -427,7 +474,7 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 			return;
 		}
 		try {
-			PackageResponse response = installPackage(type, device, packageName, installDirectory,
+			PackageResponse response = installPackage(jobId, type, device, packageName, installDirectory,
 					phase -> job.phase = phase);
 			Integer resultCode = response != null ? response.getStatusCode() : null;
 			String resultLogs = response != null ? response.getLogs() : null;
