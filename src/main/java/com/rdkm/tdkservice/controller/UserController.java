@@ -108,7 +108,7 @@ public class UserController {
 		boolean isUserCreated = userService.createApprovedUser(userRequestDTO);
 		if (isUserCreated) {
 			LOGGER.info("Approved user created successfully");
-			return ResponseUtils.getCreatedResponse("User created succesfully");
+			return ResponseUtils.getCreatedResponse("User created successfully");
 		} else {
 			LOGGER.error("Error in saving approved user data");
 			throw new TDKServiceException("User creation failed");
@@ -143,6 +143,7 @@ public class UserController {
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "404", description = "User not found")
 	@ApiResponse(responseCode = "409", description = "Conflict")
+	@PreAuthorize("hasAuthority('admin')")
 	@PutMapping("/update")
 	public ResponseEntity<DataResponse> updateUser(@Valid @RequestBody UserUpdateDTO userRequest) {
 		LOGGER.info("Executing updateUser method with request: " + userRequest.toString());
@@ -193,6 +194,7 @@ public class UserController {
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "404", description = "User not found")
 	@ApiResponse(responseCode = "409", description = "Conflict")
+	@PreAuthorize("hasAuthority('admin')")
 	@DeleteMapping("/delete")
 	public ResponseEntity<Response> deleteUser(@RequestParam UUID id) {
 		LOGGER.info("Executing deleteUser method with id: " + id);
