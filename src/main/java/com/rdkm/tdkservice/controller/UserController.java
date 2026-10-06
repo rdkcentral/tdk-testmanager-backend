@@ -78,15 +78,16 @@ public class UserController {
 	 * @param userRequestDTO - User object
 	 * @return ResponseEntity<String> - response entity - message
 	 */
-	@Operation(summary = "API to Crreate the User", description = "This API is used to create the user")
+	@Operation(summary = "API to Create the User", description = "This API is used to create the user")
 	@ApiResponse(responseCode = "201", description = "Successfully signed in")
 	@ApiResponse(responseCode = "500", description = "Internal Server Error")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "409", description = "Conflict")
 	@PostMapping("/create")
 	public ResponseEntity<Response> saveUser(@RequestBody @Valid UserCreateDTO userRequestDTO) {
-		LOGGER.info("Executing saveUser method with request: " + userRequestDTO.toString());
+		LOGGER.info("Entering saveUser method");
 		userRequestDTO.setUserStatus(Constants.USER_PENDING);
+		userRequestDTO.setUserRoleName(Constants.DEFAULT_USER_ROLE);
 		boolean isUserCreated = userService.createUser(userRequestDTO);
 		if (isUserCreated) {
 			LOGGER.info("User created successfully");
@@ -102,7 +103,7 @@ public class UserController {
 	@PreAuthorize("hasAuthority('admin')")
 	@PostMapping("/admin/create")
 	public ResponseEntity<Response> createApprovedUser(@RequestBody @Valid UserCreateDTO userRequestDTO) {
-		LOGGER.info("Executing admin create user flow with request: " + userRequestDTO.toString());
+		LOGGER.info("Entering createApprovedUser method");
 		userRequestDTO.setUserStatus(Constants.USER_APPROVED);
 		boolean isUserCreated = userService.createApprovedUser(userRequestDTO);
 		if (isUserCreated) {
@@ -302,6 +303,7 @@ public class UserController {
 	 */
 	@Operation(summary = "Get Users Pending Approval", description = "This API is used to get the list of users pending approval.")
 	@ApiResponse(responseCode = "200", description = "Successfully retrieved the list of users pending approval")
+	@PreAuthorize("hasAuthority('admin')")
 	@GetMapping("/getAllPendingUsers")
 	public ResponseEntity<DataResponse> getUsersPendingApproval() {
 		LOGGER.info("Inside getUsersPendingApproval method");
