@@ -117,7 +117,7 @@ public class LoginService implements ILoginService {
 		User user = userRepository.findByUsername(signinRequest.getUsername());
 
 		// Block login for users who are not yet approved by admin
-		if (!Constants.USER_PENDING.equals(user.getStatus())) {
+		if (Constants.USER_PENDING.equals(user.getStatus())) {
 			LOGGER.error("User account is not approved: " + user.getUsername());
 			throw new UserInputException("Your account is not approved. Please contact your administrator.");
 		}
