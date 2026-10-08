@@ -48,6 +48,7 @@ import com.rdkm.tdkservice.response.Response;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 	private static final Logger logger = Logger.getLogger(GlobalExceptionHandler.class.getName());
+	private static final String INVALID_LOGIN_MESSAGE = "Username or password is incorrect. Please check.";
 
 	/**
 	 * This method is used to handle the validation exceptions and return the error
@@ -76,8 +77,9 @@ public class GlobalExceptionHandler {
 	 */
 
 	@ExceptionHandler(UsernameNotFoundException.class)
-	public ResponseEntity<String> handleUsernameNotFoundException() {
-		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Incorrect username or password");
+	public ResponseEntity<Response> handleUsernameNotFoundException() {
+		Response errorResponse = new Response(INVALID_LOGIN_MESSAGE, HttpStatus.UNAUTHORIZED.value());
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
 	}
 
 	/**
@@ -147,7 +149,7 @@ public class GlobalExceptionHandler {
 	 */
 	@ExceptionHandler(BadCredentialsException.class)
 	public ResponseEntity<Response> handleBadCredentialsException(BadCredentialsException ex) {
-		Response errorResponse = new Response("Incorrect password", HttpStatus.UNAUTHORIZED.value());
+		Response errorResponse = new Response(INVALID_LOGIN_MESSAGE, HttpStatus.UNAUTHORIZED.value());
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
 	}
 
@@ -173,7 +175,7 @@ public class GlobalExceptionHandler {
 	 */
 	@ExceptionHandler(InternalAuthenticationServiceException.class)
 	public ResponseEntity<Response> handleInternalAuthenticationServiceException() {
-		Response errorResponse = new Response("Incorrect username or password", HttpStatus.UNAUTHORIZED.value());
+		Response errorResponse = new Response(INVALID_LOGIN_MESSAGE, HttpStatus.UNAUTHORIZED.value());
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
 	}
 
