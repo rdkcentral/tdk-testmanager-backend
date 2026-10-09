@@ -1548,7 +1548,8 @@ public class ExecutionService implements IExecutionService {
 
 		List<ExecutionMethodResult> methodResults;
 		try {
-			methodResults = executionMethodResultRepository.findByExecutionResult(executionResult);
+			methodResults = executionMethodResultRepository
+					.findByExecutionResultOrderByCreatedDateAscIdAsc(executionResult);
 			int methodCount = methodResults.size();
 			response.setTestCaseCount(methodCount);
 

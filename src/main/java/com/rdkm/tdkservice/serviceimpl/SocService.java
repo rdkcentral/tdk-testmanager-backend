@@ -19,15 +19,34 @@ http://www.apache.org/licenses/LICENSE-2.0
 */
 package com.rdkm.tdkservice.serviceimpl;
 
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 import com.rdkm.tdkservice.dto.SocCreateDTO;
 import com.rdkm.tdkservice.dto.SocDTO;
@@ -35,6 +54,8 @@ import com.rdkm.tdkservice.enums.Category;
 import com.rdkm.tdkservice.exception.DeleteFailedException;
 import com.rdkm.tdkservice.exception.ResourceAlreadyExistsException;
 import com.rdkm.tdkservice.exception.ResourceNotFoundException;
+import com.rdkm.tdkservice.exception.TDKServiceException;
+import com.rdkm.tdkservice.exception.UserInputException;
 import com.rdkm.tdkservice.model.Soc;
 import com.rdkm.tdkservice.model.UserGroup;
 import com.rdkm.tdkservice.repository.SocRepository;
@@ -68,12 +89,16 @@ public class SocService implements ISocService {
 	 *                                        exists.
 	 */
 	@Override
-	public boolean createSoc(SocCreateDTO socDTO) {
+	public boolean createSoc(SocCreateDTO socDTO, boolean throwExceptionFlag) {
 		LOGGER.info("socDTO: " + socDTO);
 		Category categoryValue = Category.getCategory(socDTO.getSocCategory());
-		if (socRepository.existsByNameAndCategory(socDTO.getSocName(), categoryValue)) {
+		boolean existsByNameAndCategory = socRepository.existsByNameAndCategory(socDTO.getSocName(), categoryValue);
+		if (existsByNameAndCategory && throwExceptionFlag) {
 			LOGGER.info("Soc already exists with the same name: " + socDTO.getSocName());
 			throw new ResourceAlreadyExistsException(Constants.SOC_NAME, socDTO.getSocName());
+		}
+		if (existsByNameAndCategory && !throwExceptionFlag) {
+			return false;
 		}
 		Soc soc = new Soc();
 		soc.setName(socDTO.getSocName());
@@ -84,9 +109,7 @@ public class SocService implements ISocService {
 			LOGGER.error("Error while saving Soc: " + e.getMessage());
 			return false;
 		}
-
 		return soc != null && soc.getId() != null;
-
 	}
 
 	/**
@@ -231,4 +254,163 @@ public class SocService implements ISocService {
 		}
 		return socs.stream().map(Soc::getName).collect(Collectors.toList());
 	}
+
+	/**
+	 * Downloads all SOCs by category as a single XML file.
+	 * 
+	 * @param category The category of the SOCs to download.
+	 * @return String containing XML content of all SOCs.
+	 */
+	@Override
+	public String downloadAllSocsXML(String category) {
+		LOGGER.info("Downloading all SOCs for category: {}", category);
+		Category categoryName = Category.getCategory(category);
+		if (null == categoryName) {
+			throw new ResourceNotFoundException(Constants.CATEGORY, category);
+		}
+		List<Soc> socs = socRepository.findByCategory(categoryName);
+		if (socs == null || socs.isEmpty()) {
+			throw new ResourceNotFoundException(Constants.SOC_NAME, category);
+		}
+		try {
+			Document doc = createSocsXMLDocument(socs);
+			return convertDocumentToString(doc);
+		} catch (Exception e) {
+			LOGGER.error("Error generating SOCs XML for category: " + category, e);
+			throw new TDKServiceException("Error generating SOCs XML for category: " + category);
+		}
+	}
+
+	/**
+	 * Parses an uploaded XML file and creates SOCs from it (bulk import).
+	 * 
+	 * @param file The XML file containing SOC definitions.
+	 * @return boolean true if the SOCs were created successfully.
+	 */
+	@Override
+	public boolean parseXMLForSoc(MultipartFile file) {
+		LOGGER.info("Parsing XML file for SOC details");
+		validateXMLFile(file);
+		Document doc;
+		try {
+			String xmlData = new String(file.getBytes(), StandardCharsets.UTF_8);
+			DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+			dbFactory.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+			dbFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+			dbFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+			dbFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+			dbFactory.setXIncludeAware(false);
+			dbFactory.setExpandEntityReferences(false);
+			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+			InputSource is = new InputSource(new StringReader(xmlData));
+			doc = dBuilder.parse(is);
+		} catch (Exception e) {
+			LOGGER.error("Error parsing XML file", e);
+			throw new TDKServiceException("Error parsing XML file: ");
+		}
+
+		NodeList nList = doc.getElementsByTagName("soc");
+		if (nList.getLength() == 0) {
+			LOGGER.error("No soc elements found in the XML file");
+			throw new UserInputException("No soc elements found in the XML file.");
+		}
+
+		int successCount = 0;
+		int skippedCount = 0;
+		for (int i = 0; i < nList.getLength(); i++) {
+			Node nNode = nList.item(i);
+			if (nNode.getNodeType() == Node.ELEMENT_NODE) {
+				Element eElement = (Element) nNode;
+				String name = getNodeTextContent(eElement, "name");
+				String category = getNodeTextContent(eElement, "category");
+
+				if (name == null || name.trim().isEmpty() || category == null || category.trim().isEmpty()) {
+					LOGGER.warn("Skipping soc at index {} due to missing name or category", i);
+					skippedCount++;
+					continue;
+				}
+
+				SocCreateDTO dto = new SocCreateDTO();
+				dto.setSocName(name.trim());
+				dto.setSocCategory(category.trim());
+				boolean created = createSoc(dto, false);
+				if (created) {
+					successCount++;
+				} else {
+					skippedCount++;
+				}
+			}
+		}
+
+		if (successCount == 0 && skippedCount > 0) {
+			throw new TDKServiceException("No SOCs were created. All " + skippedCount + " entries were skipped (duplicates or invalid data).");
+		}
+		LOGGER.info("SOC XML upload complete. Created: {}, Skipped: {}", successCount, skippedCount);
+		return true;
+	}
+
+	/**
+	 * Creates an XML document containing all SOCs.
+	 */
+	private Document createSocsXMLDocument(List<Soc> socs) throws ParserConfigurationException {
+		DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+		DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+		Document doc = dBuilder.newDocument();
+
+		Element rootElement = doc.createElement("socs");
+		doc.appendChild(rootElement);
+
+		for (Soc soc : socs) {
+			Element socElement = doc.createElement("soc");
+			rootElement.appendChild(socElement);
+
+			Element nameEl = doc.createElement("name");
+			nameEl.setTextContent(soc.getName());
+			socElement.appendChild(nameEl);
+
+			Element categoryEl = doc.createElement("category");
+			categoryEl.setTextContent(soc.getCategory() != null ? soc.getCategory().getName() : "");
+			socElement.appendChild(categoryEl);
+		}
+
+		return doc;
+	}
+
+	/**
+	 * Converts a Document to its String representation.
+	 */
+	private String convertDocumentToString(Document doc) throws TransformerException {
+		TransformerFactory transformerFactory = TransformerFactory.newInstance();
+		Transformer transformer = transformerFactory.newTransformer();
+		transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+		DOMSource source = new DOMSource(doc);
+		StringWriter writer = new StringWriter();
+		StreamResult result = new StreamResult(writer);
+		transformer.transform(source, result);
+		return writer.toString();
+	}
+
+	/**
+	 * Gets the text content of a node in an XML element.
+	 */
+	private String getNodeTextContent(Element eElement, String tagName) {
+		Node node = eElement.getElementsByTagName(tagName).item(0);
+		return node != null ? node.getTextContent() : null;
+	}
+
+	/**
+	 * Validates the uploaded XML file.
+	 */
+	private void validateXMLFile(MultipartFile file) {
+		String fileName = file.getOriginalFilename();
+		if (fileName == null || !fileName.endsWith(Constants.XML_EXTENSION)) {
+			LOGGER.error("The uploaded file must have a .xml extension {}", fileName);
+			throw new UserInputException("The uploaded file must be a .xml file.");
+		}
+		if (file.isEmpty()) {
+			LOGGER.error("The uploaded file is empty");
+			throw new UserInputException("The uploaded file is empty.");
+		}
+	}
+
 }

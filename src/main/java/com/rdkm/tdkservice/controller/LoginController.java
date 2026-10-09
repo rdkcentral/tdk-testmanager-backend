@@ -94,7 +94,7 @@ public class LoginController {
 	@ApiResponse(responseCode = "409", description = "Conflict , unique fields already existing")
 	@PostMapping("/signup")
 	public ResponseEntity<Response> signUp(@RequestBody @Valid UserCreateDTO registerRequest) {
-		LOGGER.info("Received signup request: " + registerRequest.toString());
+		LOGGER.info("Entered signUp controller");
 		boolean isUserCreated = loginService.register(registerRequest);
 		if (isUserCreated) {
 			LOGGER.info("User creation is successfull");
@@ -131,11 +131,11 @@ public class LoginController {
 	@ApiResponse(responseCode = "404", description = "User not found")
 	@PostMapping("/signin")
 	public ResponseEntity<DataResponse> signIn(@RequestBody @Valid SigninRequestDTO signinRequest) {
-		LOGGER.info("Received sign request: " + signinRequest.toString());
+		LOGGER.info("Entered signIn controller");
 		SigninResponseDTO signinResponseDTO = loginService.signIn(signinRequest);
-		LOGGER.info("Finished signin request, response id: " + signinResponseDTO.toString());
 		ResponseEntity<DataResponse> dataResponse = ResponseUtils.getSuccessDataResponse("Signin is successful",
 				signinResponseDTO);
+		LOGGER.info("Exited signIn controller");
 		return dataResponse;
 	}
 

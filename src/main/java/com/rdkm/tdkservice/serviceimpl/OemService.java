@@ -22,19 +22,35 @@ package com.rdkm.tdkservice.serviceimpl;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
+import java.nio.charset.StandardCharsets;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-
+import org.springframework.web.multipart.MultipartFile;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import java.io.StringReader;
+import java.io.StringWriter;
 import com.rdkm.tdkservice.dto.OemCreateDTO;
 import com.rdkm.tdkservice.dto.OemDTO;
 import com.rdkm.tdkservice.enums.Category;
 import com.rdkm.tdkservice.exception.DeleteFailedException;
 import com.rdkm.tdkservice.exception.ResourceAlreadyExistsException;
 import com.rdkm.tdkservice.exception.ResourceNotFoundException;
+import com.rdkm.tdkservice.exception.TDKServiceException;
+import com.rdkm.tdkservice.exception.UserInputException;
 import com.rdkm.tdkservice.model.Oem;
 import com.rdkm.tdkservice.model.UserGroup;
 import com.rdkm.tdkservice.repository.OemRepository;
@@ -73,30 +89,29 @@ public class OemService implements IOemService {
 	 *         otherwise.
 	 */
 	@Override
-	public boolean createOem(OemCreateDTO oemDTO) {
+	public boolean createOem(OemCreateDTO oemDTO, boolean throwExceptionFlag) {
 		LOGGER.info("Going to create oemDTO with name: " + oemDTO.toString());
-
 		Category category = commonService.validateCategory(oemDTO.getOemCategory());
-
-		if (oemRepository.existsByNameAndCategory(oemDTO.getOemName(), category)) {
+		boolean existsByNameAndCategory = oemRepository.existsByNameAndCategory(oemDTO.getOemName(), category);
+		if (existsByNameAndCategory && throwExceptionFlag) {
 			LOGGER.info("oem already exists with the same name: " + oemDTO.getOemName());
 			throw new ResourceAlreadyExistsException(Constants.OEM_NAME, oemDTO.getOemName());
+		}
+		if (existsByNameAndCategory && !throwExceptionFlag) {
+			return false;
 		}
 		Oem oem = new Oem();
 		oem.setName(oemDTO.getOemName());
 		UserGroup userGroup = userGroupRepository.findByName(oemDTO.getOemUserGroup());
 		oem.setUserGroup(userGroup);
 		oem.setCategory(category);
-
 		try {
 			oem = oemRepository.save(oem);
 		} catch (Exception e) {
 			LOGGER.error("Error occurred while creating oem", e);
 			return false;
 		}
-
 		return oem != null && oem.getId() != null;
-
 	}
 
 	/**
@@ -225,6 +240,118 @@ public class OemService implements IOemService {
 			return null;
 		}
 		return oems.stream().map(Oem::getName).collect(Collectors.toList());
+	}
+
+	@Override
+	public String downloadAllOemsXML(String category) {
+		LOGGER.info("Going to download all OEMs as XML for category: " + category);
+		Category categoryEnum = commonService.validateCategory(category);
+		List<Oem> oems = oemRepository.findByCategory(categoryEnum);
+		if (oems == null || oems.isEmpty()) {
+			throw new ResourceNotFoundException(Constants.OEM_NAME, category);
+		}
+		try {
+			Document document = createOemsXMLDocument(oems);
+			return convertDocumentToString(document);
+		} catch (Exception e) {
+			LOGGER.error("Error occurred while creating OEM XML", e);
+			throw new TDKServiceException("Error in generating OEM XML");
+		}
+	}
+
+	@Override
+	public boolean parseXMLForOem(MultipartFile file) {
+		LOGGER.info("Going to parse XML for OEM upload");
+		validateXMLFile(file);
+		try {
+			String xmlContent = new String(file.getBytes(), StandardCharsets.UTF_8);
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			factory.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+			factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+			factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+			factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+			factory.setXIncludeAware(false);
+			factory.setExpandEntityReferences(false);
+			DocumentBuilder builder = factory.newDocumentBuilder();
+			Document document = builder.parse(new InputSource(new StringReader(xmlContent)));
+			document.getDocumentElement().normalize();
+
+			NodeList oemNodes = document.getElementsByTagName("oem");
+			for (int i = 0; i < oemNodes.getLength(); i++) {
+				Node node = oemNodes.item(i);
+				if (node.getNodeType() == Node.ELEMENT_NODE) {
+					Element element = (Element) node;
+					String name = getNodeTextContent(element, "name");
+					String category = getNodeTextContent(element, "category");
+					if (name == null || name.isEmpty() || category == null || category.isEmpty()) {
+						continue;
+					}
+					OemCreateDTO dto = new OemCreateDTO();
+					dto.setOemName(name);
+					dto.setOemCategory(category);
+					try {
+						createOem(dto, false);
+					} catch (Exception e) {
+						LOGGER.info("Exception occurred while creating OEM: " + name, e);
+					}
+				}
+			}
+			return true;
+		} catch (Exception e) {
+			LOGGER.error("Error occurred while parsing OEM XML", e);
+			throw new TDKServiceException("Error in parsing OEM XML: ");
+		}
+	}
+
+	private Document createOemsXMLDocument(List<Oem> oems) throws Exception {
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+		DocumentBuilder builder = factory.newDocumentBuilder();
+		Document document = builder.newDocument();
+
+		Element rootElement = document.createElement("oems");
+		document.appendChild(rootElement);
+
+		for (Oem oem : oems) {
+			Element oemElement = document.createElement("oem");
+			rootElement.appendChild(oemElement);
+
+			Element nameElement = document.createElement("name");
+			nameElement.setTextContent(oem.getName());
+			oemElement.appendChild(nameElement);
+
+			Element categoryElement = document.createElement("category");
+			categoryElement.setTextContent(oem.getCategory().name());
+			oemElement.appendChild(categoryElement);
+		}
+		return document;
+	}
+
+	private String convertDocumentToString(Document document) throws Exception {
+		TransformerFactory transformerFactory = TransformerFactory.newInstance();
+		Transformer transformer = transformerFactory.newTransformer();
+		transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+		transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+		StringWriter writer = new StringWriter();
+		transformer.transform(new DOMSource(document), new StreamResult(writer));
+		return writer.toString();
+	}
+
+	private String getNodeTextContent(Element element, String tagName) {
+		NodeList nodeList = element.getElementsByTagName(tagName);
+		if (nodeList.getLength() > 0) {
+			return nodeList.item(0).getTextContent().trim();
+		}
+		return null;
+	}
+
+	private void validateXMLFile(MultipartFile file) {
+		if (file == null || file.isEmpty()) {
+			throw new UserInputException("File is empty or not provided");
+		}
+		String fileName = file.getOriginalFilename();
+		if (fileName == null || !fileName.toLowerCase().endsWith(".xml")) {
+			throw new UserInputException("Invalid file format. Please upload an XML file");
+		}
 	}
 
 }
