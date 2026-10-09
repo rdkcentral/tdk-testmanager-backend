@@ -285,7 +285,7 @@ public class UserService implements UserDetailsService {
 	 *                                   exist.
 	 */
 	public UserDTO updateUser(UserUpdateDTO updateUserRequest) {
-		LOGGER.info("Executing updateUser method for the user: " + updateUserRequest.toString());
+		LOGGER.info("Entered updateUser service");
 
 		// Retrieve the user from the database
 		User user = userRepository.findById(updateUserRequest.getUserId()).orElseThrow(
@@ -397,7 +397,7 @@ public class UserService implements UserDetailsService {
 	 * @return boolean - returns true if password is changed successfully
 	 */
 	public boolean changePassword(ChangePasswordRequestDTO changePasswordRequest) {
-		LOGGER.info("The change password request is " + changePasswordRequest.toString());
+		LOGGER.info("Entered changePassword service");
 
 		if (changePasswordRequest.getNewPassword().trim().equals(changePasswordRequest.getOldPassword().trim())) {
 			throw new UserInputException("Old password and New password are same");

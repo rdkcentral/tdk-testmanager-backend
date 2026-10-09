@@ -85,7 +85,7 @@ public class UserController {
 	@ApiResponse(responseCode = "409", description = "Conflict")
 	@PostMapping("/create")
 	public ResponseEntity<Response> saveUser(@RequestBody @Valid UserCreateDTO userRequestDTO) {
-		LOGGER.info("Entering saveUser method");
+		LOGGER.info("Entering saveUser controller");
 		userRequestDTO.setUserStatus(Constants.USER_PENDING);
 		userRequestDTO.setUserRoleName(Constants.DEFAULT_USER_ROLE);
 		boolean isUserCreated = userService.createUser(userRequestDTO);
@@ -146,7 +146,7 @@ public class UserController {
 	@PreAuthorize("hasAuthority('admin')")
 	@PutMapping("/update")
 	public ResponseEntity<DataResponse> updateUser(@Valid @RequestBody UserUpdateDTO userRequest) {
-		LOGGER.info("Executing updateUser method with request: " + userRequest.toString());
+		LOGGER.info("Entered updateUser controller");
 		UserDTO updatedUser = userService.updateUser(userRequest);
 		if (null != updatedUser) {
 			LOGGER.info("User updated successfully");
@@ -228,7 +228,7 @@ public class UserController {
 	@ApiResponse(responseCode = "403", description = "Forbidden")
 	@PostMapping("/changepassword")
 	public ResponseEntity<Response> changePassword(@RequestBody @Valid ChangePasswordRequestDTO changePasswordRequest) {
-		LOGGER.info("The change password request is " + changePasswordRequest.toString());
+		LOGGER.info("Entered changePassword controller");
 		boolean isChangePassword = userService.changePassword(changePasswordRequest);
 		if (isChangePassword) {
 			LOGGER.info("Password change is successful");
