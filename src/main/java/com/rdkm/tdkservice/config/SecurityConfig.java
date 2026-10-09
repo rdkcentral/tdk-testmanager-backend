@@ -82,7 +82,8 @@ public class SecurityConfig {
 									"/api/v1/script/**", "/api/v1/users/create", "/api/v1/version/**")
 							.permitAll()
 							.requestMatchers("/api/v1/users/admin/create", "/api/v1/users/update", "/api/v1/users/delete",
-									"/api/v1/users/approveUser", "/api/v1/users/rejectUser", "/api/v1/users/getAllPendingUsers")
+							"/api/v1/users/approveUser", "/api/v1/users/rejectUser", "/api/v1/users/getAllPendingUsers",
+							"/api/v1/users/findAll", "/api/v1/users/findById/**")
 							.hasAuthority("admin")
 							.requestMatchers("/api/v1/users/**").authenticated()
 							.requestMatchers(SWAGGER_UI).permitAll().anyRequest().authenticated())

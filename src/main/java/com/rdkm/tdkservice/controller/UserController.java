@@ -124,6 +124,7 @@ public class UserController {
 	@Operation(summary = "API to find the User by Id", description = "This API is used to find the user by id")
 	@ApiResponse(responseCode = "200", description = "Successfully found the user")
 	@ApiResponse(responseCode = "404", description = "User not found")
+	@PreAuthorize("hasAuthority('admin')")
 	@GetMapping("findById/{id}")
 	public ResponseEntity<DataResponse> findUserById(@PathVariable UUID id) {
 		LOGGER.info("Executing findUserById method with id: " + id);
@@ -168,6 +169,7 @@ public class UserController {
 	@ApiResponse(responseCode = "500", description = "Internal Server Error")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "409", description = "Conflict")
+	@PreAuthorize("hasAuthority('admin')")
 	@GetMapping("/findAll")
 	public ResponseEntity<DataResponse> getAllUsers() {
 		LOGGER.info("Executing getAllUsers method");
