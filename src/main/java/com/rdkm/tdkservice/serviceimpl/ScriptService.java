@@ -286,6 +286,7 @@ public class ScriptService implements IScriptService {
 		Script script = scriptRepository.findById(scriptUpdateDTO.getId()).orElseThrow(
 				() -> new ResourceNotFoundException(Constants.SCRIPT_ID, scriptUpdateDTO.getId().toString()));
 
+		String oldName = script.getName();
 		boolean hasEntityChanges = checkIfEntityChangesExist(scriptUpdateDTO, script);
 		if (!hasEntityChanges) {
 			this.updateScriptFileOnly(scriptFile, scriptUpdateDTO, script);
@@ -307,7 +308,7 @@ public class ScriptService implements IScriptService {
 			}
 		}
 
-		return this.updateTheGivenScriptAndFile(scriptFile, scriptUpdateDTO, script);
+		return this.updateTheGivenScriptAndFile(scriptFile, scriptUpdateDTO, script, oldName);
 
 	}
 
@@ -322,7 +323,7 @@ public class ScriptService implements IScriptService {
 	 * @return true if the script was updated successfully, false otherwise
 	 */
 	private boolean updateScriptFromXML(MultipartFile scriptFile, ScriptDTO scriptUpdateDTO, Script script) {
-		return this.updateTheGivenScriptAndFile(scriptFile, scriptUpdateDTO, script);
+		return this.updateTheGivenScriptAndFile(scriptFile, scriptUpdateDTO, script, scriptUpdateDTO.getName());
 	}
 
 	/**
@@ -334,7 +335,7 @@ public class ScriptService implements IScriptService {
 	 * @param script          - the script entity to be updated
 	 * @return true if the script was updated successfully, false otherwise
 	 */
-	private boolean updateTheGivenScriptAndFile(MultipartFile scriptFile, ScriptDTO scriptUpdateDTO, Script script) {
+	private boolean updateTheGivenScriptAndFile(MultipartFile scriptFile, ScriptDTO scriptUpdateDTO, Script script, String oldScriptName) {
 
 		// Get the primitive test based on the primitive test name
 		PrimitiveTest primitiveTest = primitiveTestRepository.findByName(scriptUpdateDTO.getPrimitiveTestName());
@@ -364,12 +365,6 @@ public class ScriptService implements IScriptService {
 		Category category = this.getCategoryBasedOnModule(module);
 		script.setCategory(category);
 
-		// Get script location based on the module and category
-		String scriptLocation = this.getScriptLocation(module, category);
-		if (scriptLocation != script.getScriptLocation()) {
-			this.deleteScriptFile(script.getName(), script.getScriptLocation());
-			script.setScriptLocation(scriptLocation);
-		}
 		// Updating the script entity with the updated script details
 		script = MapperUtils.updateScript(script, scriptUpdateDTO);
 
@@ -386,14 +381,25 @@ public class ScriptService implements IScriptService {
 		} else {
 			LOGGER.info("No test steps to update for the script: " + script.getName());
 		}
-
-		// If the script file is updated, validate and save the new script file
+		// Capture old script location before any changes
+		String oldScriptLocation = script.getScriptLocation();
+		// Compute new script location BEFORE file operations based on module and
+		// category
+		String newScriptLocation = this.getScriptLocation(module, category);
+		// Determine if name or location has changed
+		boolean isNameChanged = !Utils.isEmpty(scriptUpdateDTO.getName()) && !scriptUpdateDTO.getName().equals(oldScriptName);
+		boolean isLocationChanged = !newScriptLocation.equals(oldScriptLocation);
+		// If the script file is updated, validate and save to the NEW location
 		if (!scriptFile.isEmpty()) {
-			this.validateScriptFile(scriptFile, script.getName(), script.getScriptLocation());
-			// This will replave the existing file with the new file
-			this.saveScriptFile(scriptFile, script.getScriptLocation());
+			this.validateScriptFile(scriptFile, script.getName(), newScriptLocation);
+			this.saveScriptFile(scriptFile, newScriptLocation);
 		}
-
+		// Delete old file if EITHER name or location has changed
+		if (isNameChanged || isLocationChanged) {
+			this.deleteScriptFile(oldScriptName, oldScriptLocation);
+		}
+		// Update script location to the new location
+		script.setScriptLocation(newScriptLocation);
 		// Set devicetypes in the script entity if the devicetypes are updated
 		if (null != scriptUpdateDTO.getDeviceTypes() || !scriptUpdateDTO.getDeviceTypes().isEmpty()) {
 			List<DeviceType> deviceType = this.getScriptDevicetypes(scriptUpdateDTO.getDeviceTypes(),

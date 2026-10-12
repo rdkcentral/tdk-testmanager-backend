@@ -79,8 +79,9 @@ public class LoginService implements ILoginService {
 	 */
 	@Override
 	public boolean register(UserCreateDTO registerRequest) {
-		LOGGER.info("Registed user the user");
+		LOGGER.info("Entered register service");
 		boolean registeredUser = userService.createUser(registerRequest);
+		LOGGER.info("Exited register service");
 		return registeredUser;
 	}
 
@@ -103,7 +104,7 @@ public class LoginService implements ILoginService {
 	 */
 	@Override
 	public SigninResponseDTO signIn(SigninRequestDTO signinRequest) {
-		LOGGER.info("Recieved signin request" + signinRequest.toString());
+		LOGGER.info("Entered signIn service");
 		SigninResponseDTO signinResponse = new SigninResponseDTO();
 
 		// This acts as the validation for the user name , which is
@@ -137,7 +138,7 @@ public class LoginService implements ILoginService {
 			signinResponse.setUserGroupName(user.getUserGroup().getName());
 		}
 		signinResponse.setUserCategory(user.getCategory().name());
-		LOGGER.info("Finished signin request" + signinRequest.toString());
+		LOGGER.info("Exited signIn service");
 		return signinResponse;
 
 	}
