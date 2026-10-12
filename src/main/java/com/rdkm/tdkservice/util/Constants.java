@@ -654,5 +654,11 @@ public class Constants {
 	public static final String CI_APP_REGISTRY_PREFIX = "ci_app.";
 	public static final String CI_APP_REGISTRY_CALLBACK_URL_SUFFIX = ".callbackUrl";
 	public static final String CI_APP_REGISTRY_SECRET_SUFFIX = ".secret";
+	
+	// Approved status for a user
+	public static final String USER_APPROVED = "APPROVED";
+	
+	// Rejected status for a user
+	public static final String USER_REJECTED = "REJECTED";
 
 }
