@@ -311,7 +311,7 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 		String[] executeScriptCommand = { sshPass, "-p", userPassword, "ssh",
 				"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
 				user + "@" + deviceIp,
-				"mkdir -p " + installBasePath + " $(dirname " + remoteFilePath + ") && bash " + installBasePath
+				"mkdir -p " + installBasePath + " $(dirname " + remoteFilePath + ") && sh " + installBasePath
 						+ scriptName + " \"" + packageName + "\" > " + remoteFilePath + " 2>&1"
 		};
 		String[] logsCommand = { sshPass, "-p", userPassword, "ssh",
@@ -333,7 +333,7 @@ public class PackageManagerServiceImpl implements IPackageManagerService {
 				return failedInstallResponse(
 						"Failed to create install directory " + installBasePath + " on device " + device);
 			}
-			scriptExecutorService.executeScript(copyPackageCommand, 300);
+			scriptExecutorService.executeScript(copyPackageCommand, 500);
 			if (!remoteStepSucceeded(verifyPackageCommand, 60)) {
 				return failedInstallResponse("Failed to copy package " + packageName + " to device " + device);
 			}
