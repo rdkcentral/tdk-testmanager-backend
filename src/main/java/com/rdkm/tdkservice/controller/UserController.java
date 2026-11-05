@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,7 +38,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.rdkm.tdkservice.dto.UserUpdateDTO;
-
+import com.rdkm.tdkservice.util.Constants;
 import com.rdkm.tdkservice.dto.ChangePasswordRequestDTO;
 import com.rdkm.tdkservice.dto.UserCreateDTO;
 import com.rdkm.tdkservice.dto.UserDTO;
@@ -77,20 +78,39 @@ public class UserController {
 	 * @param userRequestDTO - User object
 	 * @return ResponseEntity<String> - response entity - message
 	 */
-	@Operation(summary = "API to Crreate the User", description = "This API is used to create the user")
+	@Operation(summary = "API to Create the User", description = "This API is used to create the user")
 	@ApiResponse(responseCode = "201", description = "Successfully signed in")
 	@ApiResponse(responseCode = "500", description = "Internal Server Error")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "409", description = "Conflict")
 	@PostMapping("/create")
 	public ResponseEntity<Response> saveUser(@RequestBody @Valid UserCreateDTO userRequestDTO) {
-		LOGGER.info("Entered saveUser controller");
+		LOGGER.info("Entering saveUser controller");
+		userRequestDTO.setUserStatus(Constants.USER_PENDING);
+		userRequestDTO.setUserRoleName(Constants.DEFAULT_USER_ROLE);
 		boolean isUserCreated = userService.createUser(userRequestDTO);
 		if (isUserCreated) {
 			LOGGER.info("User created successfully");
 			return ResponseUtils.getCreatedResponse("User created succesfully");
 		} else {
 			LOGGER.error("Error in saving user data");
+			throw new TDKServiceException("User creation failed");
+		}
+	}
+
+	@Operation(summary = "Admin API to create an approved user", description = "This API is used by an authenticated admin to create a pre-approved user")
+	@ApiResponse(responseCode = "201", description = "Successfully created approved user")
+	@PreAuthorize("hasAuthority('admin')")
+	@PostMapping("/admin/create")
+	public ResponseEntity<Response> createApprovedUser(@RequestBody @Valid UserCreateDTO userRequestDTO) {
+		LOGGER.info("Entering createApprovedUser method");
+		userRequestDTO.setUserStatus(Constants.USER_APPROVED);
+		boolean isUserCreated = userService.createApprovedUser(userRequestDTO);
+		if (isUserCreated) {
+			LOGGER.info("Approved user created successfully");
+			return ResponseUtils.getCreatedResponse("User created successfully");
+		} else {
+			LOGGER.error("Error in saving approved user data");
 			throw new TDKServiceException("User creation failed");
 		}
 	}
@@ -104,6 +124,7 @@ public class UserController {
 	@Operation(summary = "API to find the User by Id", description = "This API is used to find the user by id")
 	@ApiResponse(responseCode = "200", description = "Successfully found the user")
 	@ApiResponse(responseCode = "404", description = "User not found")
+	@PreAuthorize("hasAuthority('admin')")
 	@GetMapping("findById/{id}")
 	public ResponseEntity<DataResponse> findUserById(@PathVariable UUID id) {
 		LOGGER.info("Executing findUserById method with id: " + id);
@@ -123,6 +144,7 @@ public class UserController {
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "404", description = "User not found")
 	@ApiResponse(responseCode = "409", description = "Conflict")
+	@PreAuthorize("hasAuthority('admin')")
 	@PutMapping("/update")
 	public ResponseEntity<DataResponse> updateUser(@Valid @RequestBody UserUpdateDTO userRequest) {
 		LOGGER.info("Entered updateUser controller");
@@ -147,6 +169,7 @@ public class UserController {
 	@ApiResponse(responseCode = "500", description = "Internal Server Error")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "409", description = "Conflict")
+	@PreAuthorize("hasAuthority('admin')")
 	@GetMapping("/findAll")
 	public ResponseEntity<DataResponse> getAllUsers() {
 		LOGGER.info("Executing getAllUsers method");
@@ -173,6 +196,7 @@ public class UserController {
 	@ApiResponse(responseCode = "400", description = "Bad Request")
 	@ApiResponse(responseCode = "404", description = "User not found")
 	@ApiResponse(responseCode = "409", description = "Conflict")
+	@PreAuthorize("hasAuthority('admin')")
 	@DeleteMapping("/delete")
 	public ResponseEntity<Response> deleteUser(@RequestParam UUID id) {
 		LOGGER.info("Executing deleteUser method with id: " + id);
@@ -283,6 +307,7 @@ public class UserController {
 	 */
 	@Operation(summary = "Get Users Pending Approval", description = "This API is used to get the list of users pending approval.")
 	@ApiResponse(responseCode = "200", description = "Successfully retrieved the list of users pending approval")
+	@PreAuthorize("hasAuthority('admin')")
 	@GetMapping("/getAllPendingUsers")
 	public ResponseEntity<DataResponse> getUsersPendingApproval() {
 		LOGGER.info("Inside getUsersPendingApproval method");
@@ -305,8 +330,9 @@ public class UserController {
 	@Operation(summary = "Approve User", description = "This API is used to approve a user.")
 	@ApiResponse(responseCode = "200", description = "User approved successfully")
 	@ApiResponse(responseCode = "400", description = "Bad Request")
-	@GetMapping("/approveUser")
-	public ResponseEntity<Response> approveUser(String userName) {
+	@PreAuthorize("hasAuthority('admin')")
+	@PutMapping("/approveUser")
+	public ResponseEntity<Response> approveUser(@RequestParam String userName) {
 		LOGGER.info("Inside approveUser method");
 		boolean isApproved = userService.activateUser(userName);
 		if (isApproved) {
@@ -315,6 +341,30 @@ public class UserController {
 		} else {
 			LOGGER.error("Error in approving user");
 			throw new TDKServiceException("Error in approving user");
+		}
+	}
+	
+	/**
+	 * This method is used to reject the user
+	 * 
+	 * @param userName - String username of the user to be rejected
+	 * @return ResponseEntity<String> - response entity - message
+	 */
+	@Operation(summary = "Reject User", description = "This API is used to reject a pending user.")
+	@ApiResponse(responseCode = "200", description = "User rejected successfully")
+	@ApiResponse(responseCode = "400", description = "Bad Request")
+	@ApiResponse(responseCode = "404", description = "User not found")
+	@PreAuthorize("hasAuthority('admin')")
+	@PutMapping("/rejectUser")
+	public ResponseEntity<Response> rejectUser(@RequestParam String userName) {
+		LOGGER.info("Inside rejectUser method");
+		boolean isRejected = userService.rejectUser(userName);
+		if (isRejected) {
+			LOGGER.info("User rejected successfully");
+			return ResponseUtils.getSuccessResponse("User rejected successfully");
+		} else {
+			LOGGER.error("Error in rejecting user");
+			throw new TDKServiceException("Error in rejecting user");
 		}
 	}
 

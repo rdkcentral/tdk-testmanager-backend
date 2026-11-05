@@ -23,12 +23,17 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.rdkm.tdkservice.enums.Category;
+import com.rdkm.tdkservice.enums.DeviceStatus;
 import com.rdkm.tdkservice.model.Device;
 import com.rdkm.tdkservice.model.DeviceType;
+
+import jakarta.transaction.Transactional;
 
 @Repository
 public interface DeviceRepositroy extends JpaRepository<Device, UUID> {
@@ -95,6 +100,19 @@ public interface DeviceRepositroy extends JpaRepository<Device, UUID> {
 	 * @return Device This returns the found Device.
 	 */
 	Device findByName(String name);
+
+	/**
+	 * Claims a device for installation only when it is not already in use.
+	 *
+	 * @param name the device name
+	 * @param inUseStatus the status used to represent an active installation
+	 * @return one when the device was claimed, otherwise zero
+	 */
+	@Modifying
+	@Transactional
+	@Query("UPDATE Device d SET d.deviceStatus = :inUseStatus "
+			+ "WHERE d.name = :name AND (d.deviceStatus IS NULL OR d.deviceStatus <> :inUseStatus)")
+	int claimDeviceForInstall(@Param("name") String name, @Param("inUseStatus") DeviceStatus inUseStatus);
 
 	/**
 	 * This method is used to find all Devices by their category.
